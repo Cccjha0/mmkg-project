@@ -1,18 +1,31 @@
-# Python
+# cache / outputs (big files)
+cache/
+outputs/
+
+datasets/openbg_img/raw/
+datasets/openbg_img/processed/
+datasets/openbg500/raw/
+datasets/openbg500/processed/
+
+# python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
+.venv/
 venv/
-.idea/
 
-# data and outputs
-data/
-outputs/
-*.pth
+# pytorch artifacts
+*.pt
 *.ckpt
+
+# logs
 *.log
-wandb/
-tensorboard/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# macOS junk folders
+__MACOSX/
+

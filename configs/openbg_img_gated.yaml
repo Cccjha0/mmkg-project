@@ -1,0 +1,10 @@
+dataset:
+  images_root: datasets/openbg_img/raw/OpenBG-IMG_images
+  cache_dir: cache/openbg_img
+  entity2text: datasets/openbg_img/raw/OpenBG-IMG_entity2text.tsv
+
+embedding:
+  d: 256
+  image_encoder: openai/clip-vit-base-patch32
+  device: cuda
+  batch_size: 64
