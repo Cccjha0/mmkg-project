@@ -1,17 +1,28 @@
-seed_list: [1, 2, 3]
+# =========================
+# Common Config (shared)
+# =========================
+
+embedding:
+  d: 256
 
 training:
-  neg_ratio: 10
-  corrupt: both
-  batch_size: 1024
   lr: 0.001
+  batch_size: 1024
+  neg_ratio: 10
   epochs: 200
+  eval_every: 5
   early_stop_patience: 10
 
 evaluation:
   filtered: true
   chunk_size: 10000
-  metrics: [mrr, hits1, hits3, hits10]
+  dev_eval_limit: 5000   # dev 有 5000 条，默认全评测
 
-embedding:
-  d: 256
+output:
+  root_dir: outputs
+  save_best_only: true
+
+system:
+  seed: 1
+  device: cuda
+  deterministic: false

@@ -1,0 +1,120 @@
+import os
+import torch
+from tqdm import tqdm
+
+from src.data.sampler import negative_sample
+from src.eval.filtered_ranking import filtered_ranking_eval
+from src.utils.io import make_run_dir, append_csv, save_json, copy_file
+
+
+class TrainerYAML:
+    def __init__(self, model, train_triples, dev_triples, num_entities, true_tails, true_heads, cfg: dict):
+        self.model = model
+        self.train_triples = train_triples
+        self.dev_triples = dev_triples
+        self.num_entities = num_entities
+        self.true_tails = true_tails
+        self.true_heads = true_heads
+        self.cfg = cfg
+
+        self.device = cfg["system"].get("device", "cuda")
+        tr = cfg["training"]
+        ev = cfg["evaluation"]
+        out = cfg["output"]
+
+        self.lr = tr.get("lr", 1e-3)
+        self.batch_size = tr.get("batch_size", 1024)
+        self.neg_ratio = tr.get("neg_ratio", 10)
+        self.epochs = tr.get("epochs", 200)
+        self.eval_every = tr.get("eval_every", 5)
+        self.patience = tr.get("early_stop_patience", 10)
+
+        self.dev_eval_limit = ev.get("dev_eval_limit", len(dev_triples))
+        self.chunk_size = ev.get("chunk_size", 10000)
+
+        seed = cfg["system"].get("seed", 1)
+        root_dir = out.get("root_dir", "outputs")
+        exp_name = out.get("exp_name", "experiment")
+        self.run_dir = make_run_dir(root_dir, exp_name, seed)
+
+        # save config snapshot for reproducibility
+        save_json(os.path.join(self.run_dir, "config_merged.json"), cfg)
+        # also copy original yaml files if provided
+        paths = cfg.get("_config_paths", {})
+        if paths.get("common"):
+            copy_file(paths["common"], self.run_dir, "common.yaml")
+        if paths.get("exp"):
+            copy_file(paths["exp"], self.run_dir, "experiment.yaml")
+
+        self.metrics_csv = os.path.join(self.run_dir, "metrics.csv")
+        self.ckpt_path = os.path.join(self.run_dir, "best.ckpt")
+
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+
+    def train(self):
+        best_mrr = -1.0
+        bad_epochs = 0
+
+        train_tensor = torch.tensor(self.train_triples, dtype=torch.long)
+        dev_tensor = torch.tensor(self.dev_triples[: self.dev_eval_limit], dtype=torch.long)
+
+        for epoch in range(1, self.epochs + 1):
+            self.model.train()
+
+            perm = torch.randperm(train_tensor.size(0))
+            total_loss = 0.0
+            steps = 0
+
+            for i in tqdm(range(0, train_tensor.size(0), self.batch_size), desc=f"epoch {epoch}"):
+                idx = perm[i : i + self.batch_size]
+                pos = train_tensor[idx].to(self.device)
+                neg = negative_sample(pos, num_entities=self.num_entities, neg_ratio=self.neg_ratio)
+
+                loss = self.model(pos, neg)
+                self.optim.zero_grad()
+                loss.backward()
+                self.optim.step()
+
+                total_loss += float(loss.item())
+                steps += 1
+
+            avg_loss = total_loss / max(1, steps)
+            print(f"[Train] epoch={epoch} avg_loss={avg_loss:.6f}")
+
+            # eval
+            if epoch % self.eval_every == 0:
+                self.model.eval()
+                metrics = filtered_ranking_eval(
+                    model=self.model,
+                    triples=dev_tensor,
+                    true_tails=self.true_tails,
+                    true_heads=self.true_heads,
+                    num_entities=self.num_entities,
+                    chunk_size=self.chunk_size,
+                    device=self.device,
+                    ks=(1, 3, 10),
+                )
+                row = {
+                    "epoch": epoch,
+                    "avg_loss": avg_loss,
+                    "mrr": metrics["mrr"],
+                    "hits@1": metrics["hits@1"],
+                    "hits@3": metrics["hits@3"],
+                    "hits@10": metrics["hits@10"],
+                }
+                append_csv(self.metrics_csv, row, header_order=["epoch", "avg_loss", "mrr", "hits@1", "hits@3", "hits@10"])
+                print("[Dev] " + " ".join([f"{k}={v:.6f}" for k, v in metrics.items()]))
+
+                if metrics["mrr"] > best_mrr:
+                    best_mrr = metrics["mrr"]
+                    bad_epochs = 0
+                    torch.save(self.model.state_dict(), self.ckpt_path)
+                    print(f"[CKPT] saved best -> {self.ckpt_path}")
+                else:
+                    bad_epochs += 1
+                    if bad_epochs >= self.patience:
+                        print("[EarlyStop] triggered.")
+                        break
+
+        print(f"[Done] best_dev_mrr={best_mrr:.6f} run_dir={self.run_dir}")
+        return best_mrr

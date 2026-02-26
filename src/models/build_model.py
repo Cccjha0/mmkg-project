@@ -1,0 +1,30 @@
+import torch
+
+from src.models.openbg_img_gated_lp import OpenBGImgGatedLP
+
+
+def build_model(cfg: dict):
+    model_name = cfg["model"]["name"]
+
+    if model_name == "openbg_img_gated":
+        cache_dir = cfg["dataset"]["cache_dir"]
+        d = cfg["embedding"]["d"]
+        num_relations = cfg["model"]["num_relations"]
+        use_layernorm = cfg["model"].get("use_layernorm", True)
+
+        text_emb = torch.load(f"{cache_dir}/text_emb.pt")
+        img_emb = torch.load(f"{cache_dir}/img_emb.pt")
+        has_img = torch.load(f"{cache_dir}/has_img.pt")
+
+        model = OpenBGImgGatedLP(
+            text_emb=text_emb,
+            img_emb=img_emb,
+            has_img=has_img,
+            num_relations=num_relations,
+            d=d,
+            use_layernorm=use_layernorm,
+        )
+        num_entities = text_emb.shape[0]
+        return model, num_entities
+
+    raise ValueError(f"Unknown model.name: {model_name}")
