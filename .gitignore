@@ -1,11 +1,37 @@
 # cache / outputs (big files)
-cache/
-outputs/
+cache/*
+!cache/openbg500/
+!cache/openbg_img/
+cache/openbg500/**
+!cache/openbg500/.gitkeep
+cache/openbg_img/**
+!cache/openbg_img/.gitkeep
 
-datasets/openbg_img/raw/
-datasets/openbg_img/processed/
-datasets/openbg500/raw/
-datasets/openbg500/processed/
+outputs/*
+!outputs/openbg_img_gated/
+!outputs/runs/
+outputs/openbg_img_gated/*
+!outputs/openbg_img_gated/.gitkeep
+outputs/runs/**
+!outputs/runs/.gitkeep
+
+datasets/*
+!datasets/openbg_img/
+!datasets/openbg500/
+datasets/openbg_img/*
+!datasets/openbg_img/raw/
+!datasets/openbg_img/processed/
+datasets/openbg500/*
+!datasets/openbg500/raw/
+!datasets/openbg500/processed/
+datasets/openbg_img/raw/**
+!datasets/openbg_img/raw/.gitkeep
+datasets/openbg_img/processed/**
+!datasets/openbg_img/processed/.gitkeep
+datasets/openbg500/raw/**
+!datasets/openbg500/raw/.gitkeep
+datasets/openbg500/processed/**
+!datasets/openbg500/processed/.gitkeep
 
 # python
 __pycache__/
