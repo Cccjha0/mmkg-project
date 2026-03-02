@@ -1,4 +1,5 @@
 import os
+import math
 import torch
 from tqdm import tqdm
 
@@ -51,6 +52,54 @@ class TrainerYAML:
 
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
+    @torch.no_grad()
+    def _compute_gate_stats(self, sample_size: int = 5000):
+        """
+        Sample some entity ids and compute gate statistics:
+        - overall gate mean/std
+        - has_img gate mean/std
+        - no_img gate mean/std
+        """
+        # 如果模型没实现该接口（比如 Early Fusion），就返回空
+        if not hasattr(self.model, "gate_for_entities"):
+            return {}
+
+        N = self.num_entities
+        device = self.device
+
+        # sample entity ids on device
+        eids = torch.randint(0, N, (sample_size,), device=device)
+
+        g = self.model.gate_for_entities(eids).detach().cpu()  # [S]
+        has_img = self.model.has_img[eids].detach().cpu()      # [S] bool
+
+        def mean_std(x: torch.Tensor):
+            if x.numel() == 0:
+                return 0.0, 0.0
+            m = float(x.mean().item())
+            s = float(x.std(unbiased=False).item())
+            if not math.isfinite(m) or not math.isfinite(s):
+                return 0.0, 0.0
+            return m, s
+
+        g_all = g
+        g_img = g[has_img]
+        g_noimg = g[~has_img]
+
+        m_all, s_all = mean_std(g_all)
+        m_img, s_img = mean_std(g_img)
+        m_no, s_no = mean_std(g_noimg)
+
+        return {
+            "g_mean_all": m_all,
+            "g_std_all": s_all,
+            "g_mean_img": m_img,
+            "g_std_img": s_img,
+            "g_mean_noimg": m_no,
+            "g_std_noimg": s_no,
+            "g_frac_img_in_sample": float(has_img.float().mean().item()),
+        }
+
     def train(self):
         best_mrr = -1.0
         bad_epochs = 0
@@ -102,7 +151,22 @@ class TrainerYAML:
                     "hits@3": metrics["hits@3"],
                     "hits@10": metrics["hits@10"],
                 }
-                append_csv(self.metrics_csv, row, header_order=["epoch", "avg_loss", "mrr", "hits@1", "hits@3", "hits@10"])
+
+                # gate stats (only for models that support it, e.g., Gated Fusion)
+                gate_stats = self._compute_gate_stats(sample_size=5000)
+                row.update(gate_stats)
+
+                append_csv(
+                    self.metrics_csv,
+                    row,
+                    header_order=[
+                        "epoch", "avg_loss", "mrr", "hits@1", "hits@3", "hits@10",
+                        "g_mean_all", "g_std_all",
+                        "g_mean_img", "g_std_img",
+                        "g_mean_noimg", "g_std_noimg",
+                        "g_frac_img_in_sample",
+                    ]
+                )
                 print("[Dev] " + " ".join([f"{k}={v:.6f}" for k, v in metrics.items()]))
 
                 if metrics["mrr"] > best_mrr:

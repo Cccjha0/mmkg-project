@@ -54,6 +54,17 @@ class OpenBGImgGatedLP(nn.Module):
         return self.decoder.score(zh, r, zt)
 
     @torch.no_grad()
+    def gate_for_entities(self, eids: torch.LongTensor) -> torch.Tensor:
+        """
+        eids: [B] entity ids on device
+        return: gate g [B] in [0,1]
+        """
+        t = self._entity_text(eids)
+        v = self._entity_image(eids)
+        _, g = self.fusion(t, v)  # [B,1]
+        return g.squeeze(-1)
+
+    @torch.no_grad()
     def score_eval(self, triples: torch.LongTensor) -> torch.Tensor:
         return self.score(triples)
 
