@@ -1,27 +1,29 @@
-# OpenBG Link Prediction (Gated Fusion)
+# OpenBG Link Prediction Framework
 
-This repository currently focuses on **OpenBG-IMG link prediction** with a
-**text-image Gated Fusion** model.
+This repository is a configurable framework for OpenBG link prediction
+experiments.  
+The current mainline is **OpenBG-IMG + relation-aware gated fusion + entity residual**.
 
-## Current Scope
+## What Is Implemented Now
 
-- Dataset: OpenBG-IMG
-- Model: `openbg_img_gated`
+- Dataset pipeline: OpenBG-IMG (`train/dev/test` TSV + entity images)
 - Training entry: `scripts/run_train.py`
-- Config files:
-  - `configs/openbg_img_gated.yaml`
-  - `configs/common.yaml`
+- Active model builder path: `src/models/build_model.py` -> `openbg_img_gated`
+- Current gated model features:
+  - vector gate
+  - relation-aware gate bias
+  - entity residual branch
+  - positive residual scale via `softplus`
 
-Other placeholder files (for teammate extensions) may exist but are not part of
-the active training pipeline.
-
-## Repository Structure
+## Repository Layout
 
 ```text
 openbg-lp/
   configs/
     common.yaml
     openbg_img_gated.yaml
+    openbg_img_gated_vec_res_final.yaml
+    openbg_img_gated_vec_res_rel.yaml
   scripts/
     run_train.py
     build_cache_openbg_img_text.py
@@ -33,14 +35,22 @@ openbg-lp/
     models/
     train/
     utils/
-  datasets/            # directory skeleton tracked with .gitkeep
-  cache/               # directory skeleton tracked with .gitkeep
-  outputs/             # directory skeleton tracked with .gitkeep
+  datasets/    # tracked as empty skeleton via .gitkeep
+  cache/       # tracked as empty skeleton via .gitkeep
+  outputs/     # tracked as empty skeleton via .gitkeep
 ```
 
-## Data Placement
+## 1) Environment Setup
 
-Datasets are not included in this repository. Place files under:
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## 2) Put Dataset Files in `raw`
+
+Place OpenBG-IMG files under:
 
 ```text
 datasets/openbg_img/raw/
@@ -55,17 +65,15 @@ Required files:
 - `OpenBG-IMG_relation2text.tsv`
 - `OpenBG-IMG_images/` (`ent_xxxxxx/image_0.jpg`)
 
-## Environment Setup
+Notes:
 
-```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+- Keep original source files in `raw/`.
+- If you need cleaned/intermediate artifacts, put them under
+  `datasets/openbg_img/processed/`.
 
-## Step 1: Build Cache (Text + Image)
+## 3) Build Feature Cache
 
-Build text embeddings cache:
+Run text cache build:
 
 ```bash
 python scripts/build_cache_openbg_img_text.py ^
@@ -73,7 +81,7 @@ python scripts/build_cache_openbg_img_text.py ^
   --cache_dir cache/openbg_img
 ```
 
-Build image embeddings cache:
+Run image cache build:
 
 ```bash
 python scripts/build_cache_openbg_img_image.py ^
@@ -82,34 +90,32 @@ python scripts/build_cache_openbg_img_image.py ^
   --cache_dir cache/openbg_img
 ```
 
-Expected cache artifacts in `cache/openbg_img/` include:
+Expected artifacts in `cache/openbg_img/`:
 
 - `text_emb.pt`
 - `has_text.pt`
 - `img_emb.pt`
 - `has_img.pt`
 
-## Step 2: Train Gated Fusion Model
+## 4) Train
+
+Recommended relation-aware run:
 
 ```bash
-python scripts/run_train.py --config configs/openbg_img_gated.yaml --common configs/common.yaml
+python scripts/run_train.py --config configs/openbg_img_gated_vec_res_rel.yaml --common configs/common.yaml
 ```
 
-## Evaluation
+Alternative configs:
 
-Evaluation uses filtered ranking metrics:
+- `configs/openbg_img_gated.yaml` (baseline gated branch)
+- `configs/openbg_img_gated_vec_res_final.yaml` (longer/more stable search setting)
 
-- MRR
-- Hits@1
-- Hits@3
-- Hits@10
+## 5) Outputs
 
-## Outputs
-
-Each run is written to:
+Each run is saved to:
 
 ```text
-outputs/openbg_img_gated/<timestamp>_seed<seed>/
+outputs/<exp_name>/<timestamp>_seed<seed>/
 ```
 
 Typical files:
@@ -117,16 +123,64 @@ Typical files:
 - `metrics.csv`
 - `best.ckpt`
 - `config_merged.json`
-- `common.yaml` (copied snapshot)
-- `experiment.yaml` (copied snapshot)
+- `common.yaml` (snapshot)
+- `experiment.yaml` (snapshot)
 
-For gated models, `metrics.csv` also includes gate statistics columns
-(`g_mean_all`, `g_std_all`, `g_mean_img`, `g_std_img`, `g_mean_noimg`,
-`g_std_noimg`, `g_frac_img_in_sample`).
+`metrics.csv` includes:
 
-## Notes on Git Tracking
+- `mrr`, `hits@1`, `hits@3`, `hits@10`
+- gate statistics columns:
+  `g_mean_all`, `g_std_all`, `g_mean_img`, `g_std_img`,
+  `g_mean_noimg`, `g_std_noimg`, `g_frac_img_in_sample`
+
+## 6) How Teammates Extend the Framework
+
+This is the key workflow for teammates (for example, a text-model member).
+
+### A. Add model code
+
+- Put new model class in `src/models/...`
+- Keep model API compatible with trainer:
+  - `forward(pos_triples, neg_triples) -> loss`
+  - `score(triples) -> scores`
+
+### B. Register model in builder
+
+- Edit `src/models/build_model.py`
+- Add a new `model.name` branch that constructs your model and returns:
+  - `model`
+  - `num_entities`
+
+Without this step, `run_train.py` cannot instantiate your model.
+
+### C. Create experiment config
+
+- Add `configs/<your_exp>.yaml`
+- At minimum include:
+  - dataset paths
+  - `model.name`
+  - model-specific fields
+  - `output.exp_name`
+
+`scripts/run_train.py` merges `common.yaml` + your exp config.
+
+### D. If your model needs extra preprocessing
+
+- Add a script under `scripts/` (or `scripts/debug/` for temporary checks)
+- Save generated features to `cache/...`
+- Reference those cache files in your model build branch
+
+Example: text-only model members can add a dedicated text embedding cache script
+and load it inside their `build_model` branch.
+
+### E. Keep debug code separated
+
+- Put one-off checks in `scripts/debug/`
+- Avoid coupling debug scripts to the main training entry
+
+## 7) Notes on Tracking and Large Files
 
 - Directory skeletons are tracked via `.gitkeep`.
 - Large dataset/cache/output contents are ignored by `.gitignore`.
-- `outputs/openbg_img_gated` keeps the directory itself, but run result folders
+- `outputs/openbg_img_gated` keeps directory structure, while run result folders
   remain untracked.
