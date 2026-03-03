@@ -2,7 +2,7 @@ import os
 import sys
 import torch
 
-sys.path.append(os.path.abspath("."))
+sys.path.append(os.path.abspath(".."))
 
 from src.data.build_true_facts import build_true_facts
 from src.eval.filtered_ranking import filtered_ranking_eval

@@ -3,7 +3,7 @@ import sys
 import torch
 import random
 
-sys.path.append(os.path.abspath("."))
+sys.path.append(os.path.abspath(".."))
 
 from src.models.openbg_img_gated_lp import OpenBGImgGatedLP
 
