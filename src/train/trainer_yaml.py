@@ -1,6 +1,7 @@
 import os
 import math
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 
 from src.data.sampler import negative_sample
@@ -168,6 +169,11 @@ class TrainerYAML:
                     ]
                 )
                 print("[Dev] " + " ".join([f"{k}={v:.6f}" for k, v in metrics.items()]))
+
+                # print residual_scale if exists
+                if hasattr(self.model, "residual_scale"):
+                    rs = F.softplus(self.model.residual_scale).detach().cpu().item()
+                    print(f"[Debug] residual_scale = {rs:.6f}")
 
                 if metrics["mrr"] > best_mrr:
                     best_mrr = metrics["mrr"]
