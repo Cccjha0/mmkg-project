@@ -1,223 +1,132 @@
-# OpenBG-Link Prediction
+# OpenBG Link Prediction (Gated Fusion)
 
-A systematic study on link prediction in commodity knowledge graphs,
-focusing on textual and multimodal (text + image) fusion strategies.
+This repository currently focuses on **OpenBG-IMG link prediction** with a
+**text-image Gated Fusion** model.
 
-This project is developed for undergraduate thesis research.
+## Current Scope
 
----
+- Dataset: OpenBG-IMG
+- Model: `openbg_img_gated`
+- Training entry: `scripts/run_train.py`
+- Config files:
+  - `configs/openbg_img_gated.yaml`
+  - `configs/common.yaml`
 
-## 📌 Project Overview
+Other placeholder files (for teammate extensions) may exist but are not part of
+the active training pipeline.
 
-We conduct a systematic comparison of different modeling strategies for link prediction on:
+## Repository Structure
 
-- **OpenBG500L** (Text-based Knowledge Graph)
-- **OpenBG-IMG** (Multimodal Knowledge Graph with text and images)
-
-Our goal is to investigate:
-
-- Whether textual information improves KGE
-- Whether multimodal fusion improves performance
-- Whether dynamic fusion (Gated) outperforms static fusion (Early)
-
----
-
-## 📂 Repository Structure
-
-```
+```text
 openbg-lp/
- │
- ├── datasets/
- │   ├── openbg500/
- │   │   └── raw/
- │   └── openbg_img/
- │       └── raw/
- │
- ├── cache/               # Precomputed embeddings (NOT tracked by git)
- ├── configs/             # Experiment configs
- ├── scripts/             # Entry scripts
- ├── src/
- │   ├── data/
- │   ├── eval/
- │   ├── models/
- │   ├── train/
- │   └── utils/
- │
- ├── outputs/             # Experiment outputs (NOT tracked by git)
- ├── requirements.txt
- └── README.md
+  configs/
+    common.yaml
+    openbg_img_gated.yaml
+  scripts/
+    run_train.py
+    build_cache_openbg_img_text.py
+    build_cache_openbg_img_image.py
+    debug/
+  src/
+    data/
+    eval/
+    models/
+    train/
+    utils/
+  datasets/            # directory skeleton tracked with .gitkeep
+  cache/               # directory skeleton tracked with .gitkeep
+  outputs/             # directory skeleton tracked with .gitkeep
 ```
 
----
+## Data Placement
 
-## 📊 Datasets
+Datasets are not included in this repository. Place files under:
 
-⚠️ Datasets are **NOT included** in this repository due to size limitations.
-
-Please download the datasets separately and place them in the following directories:
-
-```
-datasets/openbg500/raw/
+```text
 datasets/openbg_img/raw/
 ```
 
-### Required Files
+Required files:
 
-#### OpenBG500
-- OpenBG500-L_train.tsv
-- OpenBG500-L_dev.tsv
-- OpenBG500-L_test.tsv
-- OpenBG500-L_entity2text.tsv
-- OpenBG500-L_relation2text.tsv
+- `OpenBG-IMG_train.tsv`
+- `OpenBG-IMG_dev.tsv`
+- `OpenBG-IMG_test.tsv`
+- `OpenBG-IMG_entity2text.tsv`
+- `OpenBG-IMG_relation2text.tsv`
+- `OpenBG-IMG_images/` (`ent_xxxxxx/image_0.jpg`)
 
-#### OpenBG-IMG
-- OpenBG-IMG_train.tsv
-- OpenBG-IMG_dev.tsv
-- OpenBG-IMG_test.tsv
-- OpenBG-IMG_entity2text.tsv
-- OpenBG-IMG_relation2text.tsv
-- OpenBG-IMG_images/ (ent_xxxxxx/image_0.jpg)
-
----
-
-## 🛠 Environment Setup
-
-### 1️⃣ Create virtual environment (recommended)
+## Environment Setup
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
-```
-
-### 2️⃣ Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
----
+## Step 1: Build Cache (Text + Image)
 
-## ⚙️ Step 1: Build Feature Cache (OpenBG-IMG)
-
-Before training multimodal models, precompute embeddings:
+Build text embeddings cache:
 
 ```bash
-python scripts/build_cache_openbg_img.py --config configs/openbg_img_gated.yaml
+python scripts/build_cache_openbg_img_text.py ^
+  --entity2text datasets/openbg_img/raw/OpenBG-IMG_entity2text.tsv ^
+  --cache_dir cache/openbg_img
 ```
 
-This will generate:
-
-```
-cache/openbg_img/
-text_emb.pt
-img_emb.pt
-has_text.pt
-has_img.pt
-```
-
----
-
-## 🚀 Step 2: Train Models
-
-### 🔹 OpenBG500
-
-Text-KGE:
+Build image embeddings cache:
 
 ```bash
-python scripts/run_openbg500_textkge.py --config configs/openbg500_textkge.yaml
+python scripts/build_cache_openbg_img_image.py ^
+  --entity2text datasets/openbg_img/raw/OpenBG-IMG_entity2text.tsv ^
+  --images_root datasets/openbg_img/raw/OpenBG-IMG_images ^
+  --cache_dir cache/openbg_img
 ```
 
-Text-RGCN:
+Expected cache artifacts in `cache/openbg_img/` include:
+
+- `text_emb.pt`
+- `has_text.pt`
+- `img_emb.pt`
+- `has_img.pt`
+
+## Step 2: Train Gated Fusion Model
 
 ```bash
-python scripts/run_openbg500_textrgcn.py --config configs/openbg500_textrgcn.yaml
+python scripts/run_train.py --config configs/openbg_img_gated.yaml --common configs/common.yaml
 ```
 
----
+## Evaluation
 
-### 🔹 OpenBG-IMG
+Evaluation uses filtered ranking metrics:
 
-Early Fusion:
-
-```bash
-python scripts/run_openbg_img_early.py --config configs/openbg_img_early.yaml
-```
-
-Gated Fusion:
-
-```bash
-python scripts/run_openbg_img_gated.py --config configs/openbg_img_gated.yaml
-```
-
----
-
-## 📈 Evaluation Metrics
-
-All models are evaluated using:
-
-- Filtered MRR
+- MRR
 - Hits@1
 - Hits@3
 - Hits@10
 
-Evaluation follows the standard filtered ranking protocol.
+## Outputs
 
----
+Each run is written to:
 
-## 📊 Outputs
-
-Experiment outputs are stored under:
-
-```
-outputs/
-openbg_img/
-openbg500/
+```text
+outputs/openbg_img_gated/<timestamp>_seed<seed>/
 ```
 
-Each run contains:
+Typical files:
 
-- metrics.csv
-- best.ckpt
-- predictions_topk.jsonl
-- gate_stats.csv (for Gated model)
+- `metrics.csv`
+- `best.ckpt`
+- `config_merged.json`
+- `common.yaml` (copied snapshot)
+- `experiment.yaml` (copied snapshot)
 
----
+For gated models, `metrics.csv` also includes gate statistics columns
+(`g_mean_all`, `g_std_all`, `g_mean_img`, `g_std_img`, `g_mean_noimg`,
+`g_std_noimg`, `g_frac_img_in_sample`).
 
-## 🔬 Research Contributions
+## Notes on Git Tracking
 
-This project compares:
-
-- Structure-only KGE
-- Text-enhanced KGE
-- Early Fusion (static multimodal fusion)
-- Gated Fusion (dynamic multimodal fusion)
-
-We analyze both quantitative performance and fusion interpretability.
-
----
-
-## 👥 Team
-
-- Member A – Text-KGE
-- Member B – Text-RGCN
-- Member C – Early Fusion
-- Member D – Gated Fusion
-
----
-
-## 📌 Reproducibility
-
-All experiments are controlled by config files under `configs/`.
-
-To reproduce results:
-
-1. Place datasets correctly.
-2. Build cache.
-3. Run training scripts.
-4. Check outputs under `outputs/`.
-
----
-
-## 📄 License
-
-For academic research use only.
+- Directory skeletons are tracked via `.gitkeep`.
+- Large dataset/cache/output contents are ignored by `.gitignore`.
+- `outputs/openbg_img_gated` keeps the directory itself, but run result folders
+  remain untracked.
