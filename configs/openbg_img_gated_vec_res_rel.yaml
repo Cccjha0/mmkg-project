@@ -1,5 +1,5 @@
 # =========================
-# Experiment Config: OpenBG-IMG Gated Fusion
+# Experiment Config: OpenBG-IMG Gated Fusion (Vector Gate + Residual + Relation-aware Gate)
 # =========================
 
 dataset:
@@ -14,5 +14,8 @@ model:
   num_relations: 136
   use_layernorm: true
 
+training:
+  lr: 0.0005
+
 output:
-  exp_name: openbg_img_gated_vec_res
+  exp_name: openbg_img_gated_vec_res_rel

@@ -1,5 +1,5 @@
 # =========================
-# Experiment Config: OpenBG-IMG Gated Fusion
+# Experiment Config: OpenBG-IMG Gated Fusion (Vector Gate + Residual) Final
 # =========================
 
 dataset:
@@ -14,5 +14,14 @@ model:
   num_relations: 136
   use_layernorm: true
 
+training:
+  lr: 0.0005
+  epochs: 300
+  eval_every: 2
+  early_stop_patience: 10
+
+evaluation:
+  dev_eval_limit: 5000
+
 output:
-  exp_name: openbg_img_gated_vec_res
+  exp_name: openbg_img_gated_vec_res_softplus
