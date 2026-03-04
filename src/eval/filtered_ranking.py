@@ -8,12 +8,13 @@ def filtered_ranking_eval(
         true_heads: dict,
         num_entities: int,
         chunk_size: int = 10000,
+        query_batch_size: int = 1,
         device: str = "cuda",
         ks=(1, 3, 10),
 ):
     """
     model.score(triples) -> scores (higher is better)
-    We compute filtered ranks for both head and tail prediction.
+    We compute filtered ranks for tail prediction only: (h, r, ?).
     """
 
     model.eval()
@@ -25,90 +26,86 @@ def filtered_ranking_eval(
 
     # Precreate all entity ids once (on CPU), chunk later
     all_entities = torch.arange(num_entities, dtype=torch.long)
+    neg_inf = float("-inf")
 
-    for (h, r, t) in triples.tolist():
-        # ---------- Tail prediction: (h, r, ?) ----------
-        target_score = None
-        greater = 0
-        equal = 0  # optional tie handling
+    # Preprocess filtering sets once: (h, r) -> sorted LongTensor on CPU
+    true_tails_t = {}
+    for k, v in true_tails.items():
+        if isinstance(v, torch.Tensor):
+            vt = v.detach().cpu().to(dtype=torch.long)
+            if vt.numel() > 1:
+                vt = torch.sort(vt).values
+        else:
+            vt = torch.tensor(sorted(v), dtype=torch.long) if len(v) > 0 else torch.empty(0, dtype=torch.long)
+        true_tails_t[k] = vt
 
-        # filtered set for (h,r)
-        filt = true_tails.get((h, r), set())
+    n = triples.size(0)
+    for q_start in range(0, n, query_batch_size):
+        q_end = min(n, q_start + query_batch_size)
+        q = triples[q_start:q_end]  # [Bq,3] on CPU
+        bq = q.size(0)
 
-        for start in range(0, num_entities, chunk_size):
-            end = min(num_entities, start + chunk_size)
-            cand = all_entities[start:end].clone()
+        h = q[:, 0].to(device)
+        r = q[:, 1].to(device)
+        t = q[:, 2].to(device)
+        t_cpu = q[:, 2]  # [Bq] CPU
 
-            # apply filtering: remove other true tails by setting score=-inf
-            # keep target t
-            mask = torch.zeros_like(cand, dtype=torch.bool)
-            # mark filtered candidates
-            for tt in filt:
-                if start <= tt < end and tt != t:
-                    mask[tt - start] = True
+        # target score is just score(h,r,t) and can be computed directly once
+        target_scores = model.score(torch.stack([h, r, t], dim=1)).detach()  # [Bq]
+        target = target_scores.unsqueeze(1)  # [Bq,1]
 
-            # build batch triples [B,3]
-            batch = torch.stack([
-                torch.full((end-start,), h, dtype=torch.long),
-                torch.full((end-start,), r, dtype=torch.long),
-                cand
-            ], dim=1).to(device)
+        # filtered tail ids per query on CPU (sorted long tensors), excluding target
+        filt_excl_list = []
+        for j in range(bq):
+            key = (int(q[j, 0].item()), int(q[j, 1].item()))
+            filt_idx = true_tails_t.get(key, torch.empty(0, dtype=torch.long))
+            if filt_idx.numel() > 0:
+                filt_idx = filt_idx[filt_idx != int(t_cpu[j].item())]
+            filt_excl_list.append(filt_idx)
 
-            scores = model.score(batch).detach().cpu()  # [B]
-            scores[mask] = -1e30
-
-            # capture target score if within chunk
-            if start <= t < end:
-                target_score = scores[t - start].item()
-
-            # count how many candidates have score > target (we'll finalize after target_score known)
-            # can't do until target_score known; so we store chunk scores if needed
-            # simplest: after we know target_score, do a second pass (slow).
-            # better: compute rank in one pass by using target_score from chunk containing t.
-            if target_score is not None:
-                greater += int((scores > target_score).sum().item())
-
-        rank_tail = greater + 1
-
-        # ---------- Head prediction: (?, r, t) ----------
-        target_score = None
-        greater = 0
-
-        filt = true_heads.get((r, t), set())
+        greater = torch.zeros(bq, device=device, dtype=torch.long)
 
         for start in range(0, num_entities, chunk_size):
             end = min(num_entities, start + chunk_size)
-            cand = all_entities[start:end].clone()
+            c = end - start
+            cand = all_entities[start:end].to(device)  # [C]
 
-            mask = torch.zeros_like(cand, dtype=torch.bool)
-            for hh in filt:
-                if start <= hh < end and hh != h:
-                    mask[hh - start] = True
+            h_g = h.unsqueeze(1).expand(bq, c)
+            r_g = r.unsqueeze(1).expand(bq, c)
+            t_g = cand.unsqueeze(0).expand(bq, c)
+            batch = torch.stack([h_g.reshape(-1), r_g.reshape(-1), t_g.reshape(-1)], dim=1)
 
-            batch = torch.stack([
-                cand,
-                torch.full((end-start,), r, dtype=torch.long),
-                torch.full((end-start,), t, dtype=torch.long),
-            ], dim=1).to(device)
+            scores = model.score(batch).detach().view(bq, c)  # [Bq,C]
 
-            scores = model.score(batch).detach().cpu()
-            scores[mask] = -1e30
+            # vectorized masked assignment: build row/col indices, then assign once
+            row_chunks = []
+            col_chunks = []
+            for j in range(bq):
+                filt_idx = filt_excl_list[j]
+                if filt_idx.numel() == 0:
+                    continue
+                l = int(torch.searchsorted(filt_idx, start, right=False).item())
+                rr = int(torch.searchsorted(filt_idx, end, right=False).item())
+                local = filt_idx[l:rr]
+                if local.numel() == 0:
+                    continue
+                row_chunks.append(torch.full((local.numel(),), j, dtype=torch.long))
+                col_chunks.append(local - start)
 
-            if start <= h < end:
-                target_score = scores[h - start].item()
+            if row_chunks:
+                rows = torch.cat(row_chunks, dim=0).to(device)
+                cols = torch.cat(col_chunks, dim=0).to(device)
+                scores[rows, cols] = neg_inf
 
-            if target_score is not None:
-                greater += int((scores > target_score).sum().item())
+            greater += (scores > target).sum(dim=1)
 
-        rank_head = greater + 1
+        rank_tail = greater + 1  # [Bq]
 
         # ---------- accumulate metrics ----------
-        for rank in (rank_tail, rank_head):
-            mrr_sum += 1.0 / rank
-            for k in ks:
-                if rank <= k:
-                    hits[k] += 1
-            count += 1
+        mrr_sum += float((1.0 / rank_tail.float()).sum().item())
+        for k in ks:
+            hits[k] += int((rank_tail <= k).sum().item())
+        count += bq
 
     mrr = mrr_sum / count
     out = {"mrr": mrr}
