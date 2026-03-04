@@ -33,6 +33,7 @@ class TrainerYAML:
 
         self.dev_eval_limit = ev.get("dev_eval_limit", len(dev_triples))
         self.chunk_size = ev.get("chunk_size", 10000)
+        self.query_batch_size = ev.get("query_batch_size", 1)
 
         seed = cfg["system"].get("seed", 1)
         root_dir = out.get("root_dir", "outputs")
@@ -141,6 +142,7 @@ class TrainerYAML:
                     true_heads=self.true_heads,
                     num_entities=self.num_entities,
                     chunk_size=self.chunk_size,
+                    query_batch_size=self.query_batch_size,
                     device=self.device,
                     ks=(1, 3, 10),
                 )

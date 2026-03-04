@@ -8,10 +8,14 @@ from src.models.decoders.complex import ComplEx
 
 class OpenBGImgGatedLP(nn.Module):
     def __init__(self, text_emb: torch.Tensor, img_emb: torch.Tensor, has_img: torch.Tensor,
-                 num_relations: int, d: int = 256, use_layernorm: bool = True):
+                 num_relations: int, d: int = 256, use_layernorm: bool = True,
+                 neg_ratio: int = 10, adv_temperature: float = 1.0, img_dropout: float = 0.0):
         super().__init__()
         self.d = d
         self.num_relations = num_relations
+        self.neg_ratio = neg_ratio
+        self.adv_temperature = adv_temperature
+        self.img_dropout = float(img_dropout)
         num_entities = text_emb.shape[0]
 
         # register cached embeddings as buffers (not trainable)
@@ -35,9 +39,17 @@ class OpenBGImgGatedLP(nn.Module):
 
     def _entity_image(self, eids: torch.Tensor) -> torch.Tensor:
         v = self.img_emb[eids]  # [B,d] (zero for missing in cache)
-        mask = self.has_img[eids].unsqueeze(-1)  # [B,1] bool
+        has_img = self.has_img[eids]  # [B] bool
+        mask = has_img.unsqueeze(-1)  # [B,1] bool
         # if missing -> v_missing
         v = torch.where(mask, v, self.v_missing.unsqueeze(0).expand_as(v))
+
+        # modality dropout: only drop image modality for entities that actually have images
+        if self.training and self.img_dropout > 0:
+            drop_mask = (torch.rand(eids.size(0), device=eids.device) < self.img_dropout) & has_img
+            if drop_mask.any():
+                v = v.clone()
+                v[drop_mask] = self.v_missing
         return v
 
     def _fused_with_r(self, eids: torch.LongTensor, rids: torch.LongTensor):
@@ -78,21 +90,36 @@ class OpenBGImgGatedLP(nn.Module):
     def score_eval(self, triples: torch.LongTensor) -> torch.Tensor:
         return self.score(triples)
 
+    def self_adversarial_loss(self, pos_logits: torch.Tensor, neg_logits: torch.Tensor) -> torch.Tensor:
+        """
+        pos_logits: [B]
+        neg_logits: [B * neg_ratio]
+        """
+        B = pos_logits.size(0)
+        neg = neg_logits.view(B, self.neg_ratio)  # [B,K]
+
+        # -log(sigmoid(pos))
+        pos_loss = F.softplus(-pos_logits)
+
+        # softmax(alpha * neg) with detached weights
+        with torch.no_grad():
+            w = F.softmax(self.adv_temperature * neg, dim=1)  # [B,K]
+
+        # sum_i w_i * -log(sigmoid(-neg_i))
+        neg_loss = (w * F.softplus(neg)).sum(dim=1)
+
+        return (pos_loss + neg_loss).mean()
+
     def forward(self, pos_triples: torch.LongTensor, neg_triples: torch.LongTensor) -> torch.Tensor:
         """
-        pos_triples: [B,3], neg_triples: [B*neg_ratio,3] (or same B with multiple negatives flattened)
-        We'll do BCE loss: pos label=1, neg label=0
+        pos_triples: [B,3], neg_triples: [B*neg_ratio,3]
         """
         pos_scores = self.score(pos_triples)
         neg_scores = self.score(neg_triples)
 
-        y_pos = torch.ones_like(pos_scores)
-        y_neg = torch.zeros_like(neg_scores)
-
-        bce_loss = F.binary_cross_entropy_with_logits(pos_scores, y_pos) + \
-                   F.binary_cross_entropy_with_logits(neg_scores, y_neg)
+        main_loss = self.self_adversarial_loss(pos_scores, neg_scores)
         l2 = 1e-6 * self.entity_residual.weight.pow(2).mean()
         scale = F.softplus(self.residual_scale)
         scale_l2 = 1e-4 * scale.pow(2)
-        loss = bce_loss + l2 + scale_l2
+        loss = main_loss + l2 + scale_l2
         return loss

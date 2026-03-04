@@ -9,8 +9,12 @@ def build_model(cfg: dict):
     if model_name == "openbg_img_gated":
         cache_dir = cfg["dataset"]["cache_dir"]
         d = cfg["embedding"]["d"]
+        tr = cfg["training"]
         num_relations = cfg["model"]["num_relations"]
         use_layernorm = cfg["model"].get("use_layernorm", True)
+        neg_ratio = tr.get("neg_ratio", 10)
+        adv_temperature = tr.get("adv_temperature", 1.0)
+        img_dropout = tr.get("img_dropout", 0.0)
 
         text_emb = torch.load(f"{cache_dir}/text_emb.pt")
         img_emb = torch.load(f"{cache_dir}/img_emb.pt")
@@ -23,6 +27,9 @@ def build_model(cfg: dict):
             num_relations=num_relations,
             d=d,
             use_layernorm=use_layernorm,
+            neg_ratio=neg_ratio,
+            adv_temperature=adv_temperature,
+            img_dropout=img_dropout,
         )
         num_entities = text_emb.shape[0]
         return model, num_entities
