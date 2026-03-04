@@ -16,6 +16,11 @@ model:
 
 training:
   lr: 0.0005
+  img_dropout: 0
+
+evaluation:
+  chunk_size: 4096
+  query_batch_size: 32
 
 output:
   exp_name: openbg_img_gated_vec_res_rel
