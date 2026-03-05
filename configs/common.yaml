@@ -9,7 +9,7 @@ training:
   lr: 0.001
   batch_size: 1024
   neg_ratio: 10
-  adv_temperature: 1.0
+  adv_temperature: 2.0
   epochs: 200
   eval_every: 5
   early_stop_patience: 10

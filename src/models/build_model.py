@@ -12,6 +12,8 @@ def build_model(cfg: dict):
         tr = cfg["training"]
         num_relations = cfg["model"]["num_relations"]
         use_layernorm = cfg["model"].get("use_layernorm", True)
+        use_fusion = cfg["model"].get("use_fusion", True)
+        use_residual = cfg["model"].get("use_residual", True)
         neg_ratio = tr.get("neg_ratio", 10)
         adv_temperature = tr.get("adv_temperature", 1.0)
         img_dropout = tr.get("img_dropout", 0.0)
@@ -30,6 +32,8 @@ def build_model(cfg: dict):
             neg_ratio=neg_ratio,
             adv_temperature=adv_temperature,
             img_dropout=img_dropout,
+            use_fusion=use_fusion,
+            use_residual=use_residual,
         )
         num_entities = text_emb.shape[0]
         return model, num_entities

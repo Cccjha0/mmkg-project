@@ -1,5 +1,5 @@
 # =========================
-# Experiment Config: OpenBG-IMG Gated Fusion (Vector Gate + Residual + Relation-aware Gate)
+# Experiment Config: OpenBG-IMG Residual-Only (no fusion)
 # =========================
 
 dataset:
@@ -13,14 +13,16 @@ model:
   name: openbg_img_gated
   num_relations: 136
   use_layernorm: true
+  use_fusion: false
+  use_residual: true
 
 training:
   lr: 0.0005
-  img_dropout: 0.2
+  img_dropout: 0.1
 
 evaluation:
   chunk_size: 4096
   query_batch_size: 32
 
 output:
-  exp_name: openbg_img_gated_vec_res_rel
+  exp_name: openbg_img_residual_only

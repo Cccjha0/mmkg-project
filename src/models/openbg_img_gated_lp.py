@@ -9,13 +9,18 @@ from src.models.decoders.complex import ComplEx
 class OpenBGImgGatedLP(nn.Module):
     def __init__(self, text_emb: torch.Tensor, img_emb: torch.Tensor, has_img: torch.Tensor,
                  num_relations: int, d: int = 256, use_layernorm: bool = True,
-                 neg_ratio: int = 10, adv_temperature: float = 1.0, img_dropout: float = 0.0):
+                 neg_ratio: int = 10, adv_temperature: float = 1.0, img_dropout: float = 0.0,
+                 use_fusion: bool = True, use_residual: bool = True):
         super().__init__()
         self.d = d
         self.num_relations = num_relations
         self.neg_ratio = neg_ratio
         self.adv_temperature = adv_temperature
         self.img_dropout = float(img_dropout)
+        self.use_fusion = bool(use_fusion)
+        self.use_residual = bool(use_residual)
+        if not self.use_fusion and not self.use_residual:
+            raise ValueError("At least one of use_fusion/use_residual must be True.")
         num_entities = text_emb.shape[0]
 
         # register cached embeddings as buffers (not trainable)
@@ -55,10 +60,18 @@ class OpenBGImgGatedLP(nn.Module):
     def _fused_with_r(self, eids: torch.LongTensor, rids: torch.LongTensor):
         t = self._entity_text(eids)
         v = self._entity_image(eids)
-        z_fused, g = self.fusion(t, v, rids)
-        res = self.entity_residual(eids)
-        scale = F.softplus(self.residual_scale)  # >0
-        z = z_fused + scale * res
+        if self.use_fusion:
+            z_fused, g = self.fusion(t, v, rids)
+        else:
+            z_fused = torch.zeros_like(t)
+            g = torch.zeros_like(t)
+
+        if self.use_residual:
+            res = self.entity_residual(eids)
+            scale = F.softplus(self.residual_scale)  # >0
+            z = z_fused + scale * res
+        else:
+            z = z_fused
         return z, g
 
     def score(self, triples: torch.LongTensor) -> torch.Tensor:
@@ -80,6 +93,8 @@ class OpenBGImgGatedLP(nn.Module):
         eids: [B] entity ids on device
         return: gate g [B] in [0,1] under random relation ids
         """
+        if not self.use_fusion:
+            return torch.zeros(eids.size(0), device=eids.device)
         rids = torch.randint(0, self.num_relations, (eids.size(0),), device=eids.device)
         t = self._entity_text(eids)
         v = self._entity_image(eids)
@@ -118,8 +133,11 @@ class OpenBGImgGatedLP(nn.Module):
         neg_scores = self.score(neg_triples)
 
         main_loss = self.self_adversarial_loss(pos_scores, neg_scores)
-        l2 = 1e-6 * self.entity_residual.weight.pow(2).mean()
-        scale = F.softplus(self.residual_scale)
-        scale_l2 = 1e-4 * scale.pow(2)
-        loss = main_loss + l2 + scale_l2
+        if self.use_residual:
+            l2 = 1e-6 * self.entity_residual.weight.pow(2).mean()
+            scale = F.softplus(self.residual_scale)
+            scale_l2 = 1e-4 * scale.pow(2)
+            loss = main_loss + l2 + scale_l2
+        else:
+            loss = main_loss
         return loss
