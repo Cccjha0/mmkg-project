@@ -14,9 +14,12 @@ def build_model(cfg: dict):
         use_layernorm = cfg["model"].get("use_layernorm", True)
         use_fusion = cfg["model"].get("use_fusion", True)
         use_residual = cfg["model"].get("use_residual", True)
+        use_normalized_mix = cfg["model"].get("use_normalized_mix", False)
         neg_ratio = tr.get("neg_ratio", 10)
         adv_temperature = tr.get("adv_temperature", 1.0)
         img_dropout = tr.get("img_dropout", 0.0)
+        gate_reg_weight = tr.get("gate_reg_weight", 1e-3)
+        gate_reg_target = tr.get("gate_reg_target", 0.5)
 
         text_emb = torch.load(f"{cache_dir}/text_emb.pt")
         img_emb = torch.load(f"{cache_dir}/img_emb.pt")
@@ -34,6 +37,9 @@ def build_model(cfg: dict):
             img_dropout=img_dropout,
             use_fusion=use_fusion,
             use_residual=use_residual,
+            use_normalized_mix=use_normalized_mix,
+            gate_reg_weight=gate_reg_weight,
+            gate_reg_target=gate_reg_target,
         )
         num_entities = text_emb.shape[0]
         return model, num_entities

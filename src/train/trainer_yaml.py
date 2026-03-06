@@ -27,6 +27,7 @@ class TrainerYAML:
         self.lr = tr.get("lr", 1e-3)
         self.batch_size = tr.get("batch_size", 1024)
         self.neg_ratio = tr.get("neg_ratio", 10)
+        self.fusion_warmup_epochs = tr.get("fusion_warmup_epochs", 0)
         self.epochs = tr.get("epochs", 200)
         self.eval_every = tr.get("eval_every", 5)
         self.patience = tr.get("early_stop_patience", 10)
@@ -53,6 +54,7 @@ class TrainerYAML:
         self.ckpt_path = os.path.join(self.run_dir, "best.ckpt")
 
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.base_use_fusion = getattr(self.model, "use_fusion", None)
 
     @torch.no_grad()
     def _compute_gate_stats(self, sample_size: int = 5000):
@@ -110,6 +112,13 @@ class TrainerYAML:
         dev_tensor = torch.tensor(self.dev_triples[: self.dev_eval_limit], dtype=torch.long)
 
         for epoch in range(1, self.epochs + 1):
+            if self.base_use_fusion is not None and self.base_use_fusion and self.fusion_warmup_epochs > 0:
+                use_fusion_now = epoch > self.fusion_warmup_epochs
+                self.model.use_fusion = use_fusion_now
+                if epoch == 1 or epoch == (self.fusion_warmup_epochs + 1):
+                    phase = "warmup(residual-only)" if not use_fusion_now else "joint(fusion+residual)"
+                    print(f"[Train] phase={phase} epoch={epoch}")
+
             self.model.train()
 
             perm = torch.randperm(train_tensor.size(0))
@@ -176,6 +185,13 @@ class TrainerYAML:
                 if hasattr(self.model, "residual_scale"):
                     rs = F.softplus(self.model.residual_scale).detach().cpu().item()
                     print(f"[Debug] residual_scale = {rs:.6f}")
+                if hasattr(self.model, "use_normalized_mix") and getattr(self.model, "use_normalized_mix", False):
+                    a = F.softplus(self.model.mix_fusion_raw).detach()
+                    b = F.softplus(self.model.mix_residual_raw).detach()
+                    denom = (a + b).clamp_min(1e-12)
+                    wf = (a / denom).cpu().item()
+                    wr = (b / denom).cpu().item()
+                    print(f"[Debug] mix_w_fusion = {wf:.6f} mix_w_residual = {wr:.6f}")
 
                 if metrics["mrr"] > best_mrr:
                     best_mrr = metrics["mrr"]
