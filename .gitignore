@@ -9,11 +9,11 @@ cache/openbg_img/**
 
 outputs/*
 !outputs/openbg_img_gated/
-!outputs/runs/
+!outputs/results/
 outputs/openbg_img_gated/*
 !outputs/openbg_img_gated/.gitkeep
-outputs/runs/**
-!outputs/runs/.gitkeep
+outputs/results/**
+!outputs/results/.gitkeep
 
 datasets/*
 !datasets/openbg_img/

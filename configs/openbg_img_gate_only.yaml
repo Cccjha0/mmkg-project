@@ -17,8 +17,8 @@ model:
   use_residual: false
 
 training:
-  lr: 0.0005
-  img_dropout: 0.1
+  lr: 0.0003
+  img_dropout: 0.2
 
 evaluation:
   chunk_size: 4096

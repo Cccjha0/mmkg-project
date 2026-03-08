@@ -18,12 +18,12 @@ model:
   use_normalized_mix: true
 
 training:
-  lr: 0.0005
+  lr: 0.0003
   adv_temperature: 2.0
   img_dropout: 0.2
   gate_reg_weight: 0.0001
   gate_reg_target: 0.5
-  early_stop_patience: 4
+  early_stop_patience: 10
   fusion_warmup_epochs: 0
 
 evaluation:
