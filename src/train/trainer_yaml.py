@@ -50,7 +50,7 @@ class TrainerYAML:
         if paths.get("exp"):
             copy_file(paths["exp"], self.run_dir, "experiment.yaml")
 
-        self.metrics_csv = os.path.join(self.run_dir, "metrics.csv")
+        self.metrics_csv = os.path.join(self.run_dir, "metrics_gate_residual_seed2.csv")
         self.ckpt_path = os.path.join(self.run_dir, "best.ckpt")
 
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
