@@ -1,9 +1,11 @@
-# Frontend Module
 
-Use this directory for the web application.
+  # Multimodal Commodity Knowledge Graph
 
-Recommended submodules:
+  This is a code bundle for Multimodal Commodity Knowledge Graph. The original project is available at https://www.figma.com/design/Ae3LTinh3xhb1WfoIRPGp1/Multimodal-Commodity-Knowledge-Graph.
 
-- `src/`: UI source code
-- `public/`: static assets
-- package manager metadata and build configuration
+  ## Running the code
+
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
+  
