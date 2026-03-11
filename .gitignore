@@ -1,37 +1,37 @@
-# cache / outputs (big files)
-cache/*
-!cache/openbg500/
-!cache/openbg_img/
-cache/openbg500/**
-!cache/openbg500/.gitkeep
-cache/openbg_img/**
-!cache/openbg_img/.gitkeep
+# data and artifacts (big files)
+data/cache/*
+!data/cache/openbg500/
+!data/cache/openbg_img/
+data/cache/openbg500/**
+!data/cache/openbg500/.gitkeep
+data/cache/openbg_img/**
+!data/cache/openbg_img/.gitkeep
 
-outputs/*
-!outputs/openbg_img_gated/
-!outputs/results/
-outputs/openbg_img_gated/*
-!outputs/openbg_img_gated/.gitkeep
-outputs/results/**
-!outputs/results/.gitkeep
+ml/artifacts/outputs/*
+!ml/artifacts/outputs/openbg_img_gated/
+!ml/artifacts/outputs/results/
+ml/artifacts/outputs/openbg_img_gated/*
+!ml/artifacts/outputs/openbg_img_gated/.gitkeep
+ml/artifacts/outputs/results/**
+!ml/artifacts/outputs/results/.gitkeep
 
-datasets/*
-!datasets/openbg_img/
-!datasets/openbg500/
-datasets/openbg_img/*
-!datasets/openbg_img/raw/
-!datasets/openbg_img/processed/
-datasets/openbg500/*
-!datasets/openbg500/raw/
-!datasets/openbg500/processed/
-datasets/openbg_img/raw/**
-!datasets/openbg_img/raw/.gitkeep
-datasets/openbg_img/processed/**
-!datasets/openbg_img/processed/.gitkeep
-datasets/openbg500/raw/**
-!datasets/openbg500/raw/.gitkeep
-datasets/openbg500/processed/**
-!datasets/openbg500/processed/.gitkeep
+data/datasets/*
+!data/datasets/openbg_img/
+!data/datasets/openbg500/
+data/datasets/openbg_img/*
+!data/datasets/openbg_img/raw/
+!data/datasets/openbg_img/processed/
+data/datasets/openbg500/*
+!data/datasets/openbg500/raw/
+!data/datasets/openbg500/processed/
+data/datasets/openbg_img/raw/**
+!data/datasets/openbg_img/raw/.gitkeep
+data/datasets/openbg_img/processed/**
+!data/datasets/openbg_img/processed/.gitkeep
+data/datasets/openbg500/raw/**
+!data/datasets/openbg500/raw/.gitkeep
+data/datasets/openbg500/processed/**
+!data/datasets/openbg500/processed/.gitkeep
 
 # python
 __pycache__/
@@ -53,5 +53,4 @@ venv/
 Thumbs.db
 
 # macOS junk folders
-__MACOSX/
-
+__MACOSX__/
