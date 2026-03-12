@@ -32,3 +32,6 @@ evaluation:
 
 output:
   exp_name: openbg_img_gated_vec_res_rel
+
+inference:
+  attribute_relations: [rel_0031, rel_0092, rel_0086, rel_0096, rel_0043]

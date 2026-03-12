@@ -1,0 +1,21 @@
+# =========================
+# Experiment Config: OpenBG-IMG MM-1 Early Fusion
+# =========================
+
+dataset:
+  name: openbg_img
+  train: data/datasets/openbg_img/raw/OpenBG-IMG_train.tsv
+  dev: data/datasets/openbg_img/raw/OpenBG-IMG_dev.tsv
+  test: data/datasets/openbg_img/raw/OpenBG-IMG_test.tsv
+  cache_dir: data/cache/openbg_img
+
+model:
+  name: openbg_img_early
+  num_relations: 136
+  use_layernorm: true
+
+output:
+  exp_name: openbg_img_early
+
+inference:
+  attribute_relations: [rel_0031, rel_0092, rel_0086, rel_0096, rel_0043]

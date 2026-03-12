@@ -1,25 +1,28 @@
 from pathlib import Path
 import argparse
-import pandas as pd
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
 def set_paper_style():
-    plt.rcParams.update({
-        "figure.figsize": (8, 5),
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "font.size": 11,
-        "axes.titlesize": 13,
-        "axes.labelsize": 11,
-        "legend.fontsize": 10,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "lines.linewidth": 2.0,
-        "axes.grid": True,
-        "grid.alpha": 0.3,
-    })
+    plt.rcParams.update(
+        {
+            "figure.figsize": (8, 5),
+            "figure.dpi": 150,
+            "savefig.dpi": 300,
+            "font.size": 11,
+            "axes.titlesize": 13,
+            "axes.labelsize": 11,
+            "legend.fontsize": 10,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "lines.linewidth": 2.0,
+            "axes.grid": True,
+            "grid.alpha": 0.3,
+        }
+    )
 
 
 def load_csvs(input_dir: Path):
@@ -53,6 +56,20 @@ def align_by_epoch(dfs):
     return aligned
 
 
+def metric_available(aligned_dfs, metric: str) -> bool:
+    for _, df in aligned_dfs:
+        if metric not in df.columns:
+            return False
+        series = pd.to_numeric(df[metric], errors="coerce")
+        if series.notna().any():
+            return True
+    return False
+
+
+def all_metrics_available(aligned_dfs, metrics: list[str]) -> bool:
+    return all(metric_available(aligned_dfs, metric) for metric in metrics)
+
+
 def compute_mean_std(aligned_dfs, metric):
     epochs = aligned_dfs[0][1]["epoch"].values
     values = []
@@ -60,11 +77,12 @@ def compute_mean_std(aligned_dfs, metric):
     for name, df in aligned_dfs:
         if metric not in df.columns:
             raise ValueError(f"Metric '{metric}' not found in {name}.csv")
-        values.append(df[metric].values)
+        series = pd.to_numeric(df[metric], errors="coerce")
+        values.append(series.values)
 
     values = np.vstack(values)  # [num_seeds, num_epochs]
-    mean = values.mean(axis=0)
-    std = values.std(axis=0, ddof=0)
+    mean = np.nanmean(values, axis=0)
+    std = np.nanstd(values, axis=0, ddof=0)
     return epochs, mean, std, values
 
 
@@ -73,7 +91,7 @@ def plot_single_metric_mean_std(aligned_dfs, metric, ylabel, title, output_path)
 
     plt.figure()
     plt.plot(epochs, mean, label=f"{metric} mean")
-    plt.fill_between(epochs, mean - std, mean + std, alpha=0.2, label="± std")
+    plt.fill_between(epochs, mean - std, mean + std, alpha=0.2, label="+/- std")
     plt.xlabel("Epoch")
     plt.ylabel(ylabel)
     plt.title(title)
@@ -85,10 +103,17 @@ def plot_single_metric_mean_std(aligned_dfs, metric, ylabel, title, output_path)
 
 def plot_seed_comparison(aligned_dfs, metric, ylabel, title, output_path):
     plt.figure()
+    plotted = False
     for name, df in aligned_dfs:
         if metric not in df.columns:
             continue
-        plt.plot(df["epoch"], df[metric], label=name)
+        series = pd.to_numeric(df[metric], errors="coerce")
+        if series.notna().any():
+            plt.plot(df["epoch"], series, label=name)
+            plotted = True
+    if not plotted:
+        plt.close()
+        return
     plt.xlabel("Epoch")
     plt.ylabel(ylabel)
     plt.title(title)
@@ -109,7 +134,7 @@ def plot_hits_mean_std(aligned_dfs, output_path):
 
     plt.xlabel("Epoch")
     plt.ylabel("Hits")
-    plt.title("Hits@K vs Epoch (Mean ± Std)")
+    plt.title("Hits@K vs Epoch (Mean +/- Std)")
     plt.legend()
     plt.tight_layout()
     plt.savefig(output_path)
@@ -127,7 +152,7 @@ def plot_gate_mean(aligned_dfs, output_path):
 
     plt.xlabel("Epoch")
     plt.ylabel("Gate Mean")
-    plt.title("Gate Mean Analysis (Mean ± Std)")
+    plt.title("Gate Mean Analysis (Mean +/- Std)")
     plt.legend()
     plt.tight_layout()
     plt.savefig(output_path)
@@ -145,7 +170,7 @@ def plot_gate_std(aligned_dfs, output_path):
 
     plt.xlabel("Epoch")
     plt.ylabel("Gate Std")
-    plt.title("Gate Std Analysis (Mean ± Std)")
+    plt.title("Gate Std Analysis (Mean +/- Std)")
     plt.legend()
     plt.tight_layout()
     plt.savefig(output_path)
@@ -158,7 +183,7 @@ def plot_image_fraction(aligned_dfs, output_path):
 
     plt.figure()
     plt.plot(epochs, mean, label=metric)
-    plt.fill_between(epochs, mean - std, mean + std, alpha=0.2, label="± std")
+    plt.fill_between(epochs, mean - std, mean + std, alpha=0.2, label="+/- std")
     plt.xlabel("Epoch")
     plt.ylabel("Fraction")
     plt.title("Fraction of Image-Available Entities in Sample")
@@ -171,7 +196,7 @@ def plot_image_fraction(aligned_dfs, output_path):
 def summarize_best(aligned_dfs, out_csv):
     rows = []
     for name, df in aligned_dfs:
-        best_idx = df["mrr"].idxmax()
+        best_idx = pd.to_numeric(df["mrr"], errors="coerce").idxmax()
         row = {
             "seed": name,
             "best_epoch": int(df.loc[best_idx, "epoch"]),
@@ -186,13 +211,13 @@ def summarize_best(aligned_dfs, out_csv):
     summary_df = pd.DataFrame(rows)
 
     agg_row = {
-        "seed": "mean±std",
+        "seed": "mean+/-std",
         "best_epoch": np.nan,
-        "best_mrr": f"{summary_df['best_mrr'].mean():.4f} ± {summary_df['best_mrr'].std(ddof=0):.4f}",
-        "hits@1_at_best": f"{summary_df['hits@1_at_best'].mean():.4f} ± {summary_df['hits@1_at_best'].std(ddof=0):.4f}",
-        "hits@3_at_best": f"{summary_df['hits@3_at_best'].mean():.4f} ± {summary_df['hits@3_at_best'].std(ddof=0):.4f}",
-        "hits@10_at_best": f"{summary_df['hits@10_at_best'].mean():.4f} ± {summary_df['hits@10_at_best'].std(ddof=0):.4f}",
-        "loss_at_best": f"{summary_df['loss_at_best'].mean():.4f} ± {summary_df['loss_at_best'].std(ddof=0):.4f}",
+        "best_mrr": f"{summary_df['best_mrr'].mean():.4f} +/- {summary_df['best_mrr'].std(ddof=0):.4f}",
+        "hits@1_at_best": f"{summary_df['hits@1_at_best'].mean():.4f} +/- {summary_df['hits@1_at_best'].std(ddof=0):.4f}",
+        "hits@3_at_best": f"{summary_df['hits@3_at_best'].mean():.4f} +/- {summary_df['hits@3_at_best'].std(ddof=0):.4f}",
+        "hits@10_at_best": f"{summary_df['hits@10_at_best'].mean():.4f} +/- {summary_df['hits@10_at_best'].std(ddof=0):.4f}",
+        "loss_at_best": f"{summary_df['loss_at_best'].mean():.4f} +/- {summary_df['loss_at_best'].std(ddof=0):.4f}",
     }
 
     summary_out = pd.concat([summary_df, pd.DataFrame([agg_row])], ignore_index=True)
@@ -220,62 +245,64 @@ def main():
     for name, df in aligned_dfs:
         print(f"  - {name}: {len(df)} rows, epochs = {df['epoch'].tolist()}")
 
-    # 1. Loss
     plot_single_metric_mean_std(
         aligned_dfs,
         metric="avg_loss",
         ylabel="Average Loss",
-        title="Training Loss vs Epoch (Mean ± Std)",
-        output_path=output_dir / "loss_mean_std.png"
+        title="Training Loss vs Epoch (Mean +/- Std)",
+        output_path=output_dir / "loss_mean_std.png",
     )
 
-    # 2. MRR
     plot_single_metric_mean_std(
         aligned_dfs,
         metric="mrr",
         ylabel="MRR",
-        title="MRR vs Epoch (Mean ± Std)",
-        output_path=output_dir / "mrr_mean_std.png"
+        title="MRR vs Epoch (Mean +/- Std)",
+        output_path=output_dir / "mrr_mean_std.png",
     )
 
-    # 3. Seed-wise MRR comparison
     plot_seed_comparison(
         aligned_dfs,
         metric="mrr",
         ylabel="MRR",
         title="MRR vs Epoch (Per Seed)",
-        output_path=output_dir / "mrr_per_seed.png"
+        output_path=output_dir / "mrr_per_seed.png",
     )
 
-    # 4. Hits@K
     plot_hits_mean_std(
         aligned_dfs,
-        output_path=output_dir / "hits_mean_std.png"
+        output_path=output_dir / "hits_mean_std.png",
     )
 
-    # 5. Gate mean
-    plot_gate_mean(
-        aligned_dfs,
-        output_path=output_dir / "gate_mean_analysis.png"
-    )
+    gate_mean_metrics = ["g_mean_all", "g_mean_img", "g_mean_noimg"]
+    if all_metrics_available(aligned_dfs, gate_mean_metrics):
+        plot_gate_mean(
+            aligned_dfs,
+            output_path=output_dir / "gate_mean_analysis.png",
+        )
+    else:
+        print("Skipping gate mean plot: required metrics not available.")
 
-    # 6. Gate std
-    plot_gate_std(
-        aligned_dfs,
-        output_path=output_dir / "gate_std_analysis.png"
-    )
+    gate_std_metrics = ["g_std_all", "g_std_img", "g_std_noimg"]
+    if all_metrics_available(aligned_dfs, gate_std_metrics):
+        plot_gate_std(
+            aligned_dfs,
+            output_path=output_dir / "gate_std_analysis.png",
+        )
+    else:
+        print("Skipping gate std plot: required metrics not available.")
 
-    # 7. Image fraction
-    if "g_frac_img_in_sample" in aligned_dfs[0][1].columns:
+    if metric_available(aligned_dfs, "g_frac_img_in_sample"):
         plot_image_fraction(
             aligned_dfs,
-            output_path=output_dir / "image_fraction.png"
+            output_path=output_dir / "image_fraction.png",
         )
+    else:
+        print("Skipping image fraction plot: metric not available.")
 
-    # 8. Best summary
     summarize_best(
         aligned_dfs,
-        out_csv=output_dir / "best_summary.csv"
+        out_csv=output_dir / "best_summary.csv",
     )
 
     print(f"\nAll figures saved to: {output_dir.resolve()}")
