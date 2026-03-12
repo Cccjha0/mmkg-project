@@ -18,6 +18,7 @@ model:
   embedding_dim: 512
   num_relations: 511
   bert_cache_path: "data/cache/openbg500/entity_bert_emb.pt"
+  normalize_bert: true
 
 evaluation:
   dev_eval_limit: 500

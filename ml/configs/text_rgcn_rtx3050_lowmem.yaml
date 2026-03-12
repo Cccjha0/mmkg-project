@@ -17,13 +17,13 @@ model:
   hidden_dim: 64
   num_layers: 1
   num_bases: 4
-  sample_neighbors: 5
+  sample_neighbors: 3
   eval_on_cpu: true
   dropout: 0.1
 
 training:
   lr: 0.001
-  batch_size: 64
+  batch_size: 512
   neg_ratio: 2
   epochs: 200
   eval_every: 10
