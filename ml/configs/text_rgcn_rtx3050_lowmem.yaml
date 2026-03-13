@@ -15,25 +15,27 @@ model:
   text_emb_dim: 768
   entity_emb_file: entity_bert_emb.pt
   hidden_dim: 128
-  num_layers: 1
+  num_layers: 2
   num_bases: 4
-  sample_neighbors: 3
-  eval_on_cpu: true
+  sample_neighbors: [5, 3]
+  eval_on_cpu: false
   dropout: 0.1
 
 training:
   lr: 0.001
-  batch_size: 2048
+  batch_size: 4096
   neg_ratio: 2
   epochs: 200
   eval_every: 1
   early_stop_patience: 10
+  profile_steps: true
+  profile_log_every: 50
 
 evaluation:
   filtered: true
-  chunk_size: 1024
+  chunk_size: 8192
   query_batch_size: 32
-  dev_eval_limit: 200
+  dev_eval_limit: 1000
 
 output:
   root_dir: ml/artifacts/outputs
