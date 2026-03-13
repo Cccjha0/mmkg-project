@@ -1,6 +1,5 @@
 import os
 import math
-import time
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -33,8 +32,6 @@ class TrainerYAML:
         self.epochs = tr.get("epochs", 200)
         self.eval_every = tr.get("eval_every", 5)
         self.patience = tr.get("early_stop_patience", 10)
-        self.profile_steps = tr.get("profile_steps", False)
-        self.profile_log_every = tr.get("profile_log_every", 50)
 
         self.dev_eval_limit = ev.get("dev_eval_limit", len(dev_triples))
         self.chunk_size = ev.get("chunk_size", 10000)
@@ -59,10 +56,6 @@ class TrainerYAML:
 
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.base_use_fusion = getattr(self.model, "use_fusion", None)
-
-    def _sync_device(self):
-        if isinstance(self.device, str) and self.device.startswith("cuda") and torch.cuda.is_available():
-            torch.cuda.synchronize()
 
     @torch.no_grad()
     def _compute_gate_stats(self, sample_size: int = 5000):
@@ -132,64 +125,26 @@ class TrainerYAML:
             perm = torch.randperm(train_tensor.size(0))
             total_loss = 0.0
             steps = 0
-            sample_time = 0.0
-            forward_time = 0.0
-            backward_time = 0.0
 
-            for step_idx, i in enumerate(
-                tqdm(range(0, train_tensor.size(0), self.batch_size), desc=f"epoch {epoch}"),
-                start=1,
-            ):
+            for i in tqdm(range(0, train_tensor.size(0), self.batch_size), desc=f"epoch {epoch}"):
                 idx = perm[i : i + self.batch_size]
-
-                self._sync_device()
-                t0 = time.perf_counter()
                 pos = train_tensor[idx].to(self.device)
                 neg = negative_sample(pos, num_entities=self.num_entities, neg_ratio=self.neg_ratio)
-                self._sync_device()
-                sample_time += time.perf_counter() - t0
 
-                self._sync_device()
-                t1 = time.perf_counter()
                 loss = self.model(pos, neg)
-                self._sync_device()
-                forward_time += time.perf_counter() - t1
-
-                self._sync_device()
-                t2 = time.perf_counter()
                 self.optim.zero_grad()
                 loss.backward()
                 self.optim.step()
-                self._sync_device()
-                backward_time += time.perf_counter() - t2
 
                 total_loss += float(loss.item())
                 steps += 1
 
-                if self.profile_steps and step_idx % self.profile_log_every == 0:
-                    print(
-                        "[Profile] "
-                        f"epoch={epoch} step={step_idx} "
-                        f"sample_ms={sample_time / step_idx * 1000:.2f} "
-                        f"forward_ms={forward_time / step_idx * 1000:.2f} "
-                        f"backward_ms={backward_time / step_idx * 1000:.2f}"
-                    )
-
             avg_loss = total_loss / max(1, steps)
             print(f"[Train] epoch={epoch} avg_loss={avg_loss:.6f}")
-            print(
-                "[Profile] "
-                f"epoch={epoch} train_step_ms="
-                f"{(sample_time + forward_time + backward_time) / max(1, steps) * 1000:.2f} "
-                f"(sample={sample_time / max(1, steps) * 1000:.2f}, "
-                f"forward={forward_time / max(1, steps) * 1000:.2f}, "
-                f"backward={backward_time / max(1, steps) * 1000:.2f})"
-            )
 
             # eval
             if epoch % self.eval_every == 0:
                 self.model.eval()
-                eval_start = time.perf_counter()
                 metrics = filtered_ranking_eval(
                     model=self.model,
                     triples=dev_tensor,
@@ -201,8 +156,6 @@ class TrainerYAML:
                     device=self.device,
                     ks=(1, 3, 10),
                 )
-                self._sync_device()
-                eval_time = time.perf_counter() - eval_start
                 row = {
                     "epoch": epoch,
                     "avg_loss": avg_loss,
@@ -228,7 +181,6 @@ class TrainerYAML:
                     ]
                 )
                 print("[Dev] " + " ".join([f"{k}={v:.6f}" for k, v in metrics.items()]))
-                print(f"[Profile] epoch={epoch} eval_ms={eval_time * 1000:.2f}")
 
                 # print residual_scale if exists
                 if hasattr(self.model, "residual_scale"):

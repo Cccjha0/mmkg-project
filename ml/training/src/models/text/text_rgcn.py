@@ -241,12 +241,11 @@ class TextRGCN(nn.Module):
         cpu_triples = triples.detach().cpu()
         self._invalidate_eval_cache()
         cpu_repr = self._encode_all_entities_cpu()
-        score_device = triples.device
-        h = cpu_repr[cpu_triples[:, 0].long()].to(score_device)
-        r = cpu_triples[:, 1].long().to(score_device)
-        t = cpu_repr[cpu_triples[:, 2].long()].to(score_device)
+        h = cpu_repr[cpu_triples[:, 0].long()]
+        r = cpu_triples[:, 1].long()
+        t = cpu_repr[cpu_triples[:, 2].long()]
         out = self.decoder.score(h, r, t)
-        return out
+        return out.to(triples.device)
 
     @torch.inference_mode()
     def _encode_all_entities_cpu(self) -> torch.Tensor:
