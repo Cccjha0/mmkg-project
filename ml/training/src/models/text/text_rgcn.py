@@ -160,26 +160,34 @@ class TextRGCN(nn.Module):
         sampled_type = []
 
         for k in range(self.num_layers):
-            next_frontier = []
             fanout = self.sample_neighbors[k]
-            for node in frontier.tolist():
-                start = int(self.in_ptr[node].item())
-                end = int(self.in_ptr[node + 1].item())
-                deg = end - start
+            node_ids = frontier.tolist()
+            starts = self.in_ptr[node_ids].cpu().numpy()
+            ends = self.in_ptr[torch.tensor(node_ids) + 1].cpu().numpy()
+            degs = ends - starts
+
+            all_picks = []
+            for start, end, deg in zip(starts, ends, degs):
                 if deg <= 0:
                     continue
                 if fanout > 0 and deg > fanout:
                     pick = torch.randperm(deg)[:fanout] + start
                 else:
                     pick = torch.arange(start, end, dtype=torch.long)
-                sampled_src.append(self.in_src_sorted[pick].cpu())
-                sampled_dst.append(self.in_dst_sorted[pick].cpu())
-                sampled_type.append(self.in_type_sorted[pick].cpu())
-                next_frontier.append(self.in_src_sorted[pick].cpu())
+                all_picks.append(pick)
 
-            if not next_frontier:
+            if not all_picks:
                 break
-            frontier = torch.cat(next_frontier, dim=0).cpu().long().unique()
+
+            pick = torch.cat(all_picks)
+            sampled_src.append(self.in_src_sorted[pick].cpu())
+            sampled_dst.append(self.in_dst_sorted[pick].cpu())
+            sampled_type.append(self.in_type_sorted[pick].cpu())
+
+            next_frontier = self.in_src_sorted[pick].cpu()
+            if next_frontier.numel() == 0:
+                break
+            frontier = next_frontier.long().unique()
             all_nodes.append(frontier)
 
         all_nodes = [x.cpu().long() for x in all_nodes]
