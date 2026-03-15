@@ -42,6 +42,17 @@ def infer_text_map_paths(train_path: str | Path | None) -> tuple[Path | None, Pa
     return raw_dir / f"{prefix}_entity2text.tsv", raw_dir / f"{prefix}_relation2text.tsv"
 
 
+def infer_text_map_en_paths(train_path: str | Path | None) -> tuple[Path | None, Path | None]:
+    if not train_path:
+        return None, None
+
+    train_file = Path(train_path)
+    raw_dir = train_file.parent
+    stem = train_file.stem
+    prefix = stem[:-6] if stem.endswith("_train") else stem
+    return raw_dir / f"{prefix}_entity2text_en.tsv", raw_dir / f"{prefix}_relation2text_en.tsv"
+
+
 def load_tsv_map(path: str | Path | None) -> dict[str, str]:
     if path is None:
         return {}
@@ -62,6 +73,26 @@ def load_tsv_map(path: str | Path | None) -> dict[str, str]:
             key, value = parts
             out[key.strip()] = value.strip()
     return out
+
+
+def _is_ascii_text(value: str) -> bool:
+    return all(ord(ch) < 128 for ch in value)
+
+
+def resolve_bilingual_text(
+    token: str,
+    *,
+    zh_map: dict[str, str],
+    en_map: dict[str, str],
+) -> tuple[str | None, str | None]:
+    zh_text = zh_map.get(token)
+    en_text = en_map.get(token)
+
+    # Safe fallback: if the source text is already ASCII, reuse it for English display.
+    if en_text is None and zh_text and _is_ascii_text(zh_text):
+        en_text = zh_text
+
+    return zh_text, en_text
 
 
 def build_response(

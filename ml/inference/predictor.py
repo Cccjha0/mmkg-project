@@ -10,10 +10,12 @@ from ml.inference.utils import (
     build_response,
     format_entity_id,
     format_relation_id,
+    infer_text_map_en_paths,
     infer_text_map_paths,
     load_tsv_map,
     parse_entity_id,
     parse_relation_id,
+    resolve_bilingual_text,
 )
 
 
@@ -33,7 +35,12 @@ class Predictor:
         self.run_dir = Path(run_dir)
         self.model_name = cfg.get("model", {}).get("name", type(model).__name__)
         self.default_chunk_size = int(cfg.get("evaluation", {}).get("chunk_size", 4096))
-        self.entity_text_map, self.relation_text_map = self._load_text_maps()
+        (
+            self.entity_text_map,
+            self.relation_text_map,
+            self.entity_text_en_map,
+            self.relation_text_en_map,
+        ) = self._load_text_maps()
         self.default_attribute_relations = self._load_default_attribute_relations()
 
     def parse_entity(self, value: int | str) -> int:
@@ -49,10 +56,42 @@ class Predictor:
         return format_relation_id(relation_id)
 
     def entity_text(self, entity_id: int) -> str | None:
-        return self.entity_text_map.get(self.format_entity(entity_id))
+        return self.entity_text_zh(entity_id)
 
     def relation_text(self, relation_id: int) -> str | None:
-        return self.relation_text_map.get(self.format_relation(relation_id))
+        return self.relation_text_zh(relation_id)
+
+    def entity_text_zh(self, entity_id: int) -> str | None:
+        zh_text, _ = resolve_bilingual_text(
+            self.format_entity(entity_id),
+            zh_map=self.entity_text_map,
+            en_map=self.entity_text_en_map,
+        )
+        return zh_text
+
+    def entity_text_en(self, entity_id: int) -> str | None:
+        _, en_text = resolve_bilingual_text(
+            self.format_entity(entity_id),
+            zh_map=self.entity_text_map,
+            en_map=self.entity_text_en_map,
+        )
+        return en_text
+
+    def relation_text_zh(self, relation_id: int) -> str | None:
+        zh_text, _ = resolve_bilingual_text(
+            self.format_relation(relation_id),
+            zh_map=self.relation_text_map,
+            en_map=self.relation_text_en_map,
+        )
+        return zh_text
+
+    def relation_text_en(self, relation_id: int) -> str | None:
+        _, en_text = resolve_bilingual_text(
+            self.format_relation(relation_id),
+            zh_map=self.relation_text_map,
+            en_map=self.relation_text_en_map,
+        )
+        return en_text
 
     @torch.inference_mode()
     def predict_tail(
@@ -88,7 +127,9 @@ class Predictor:
                 {
                     "entity_id": entity_id,
                     "entity": self.format_entity(entity_id),
-                    "entity_text": self.entity_text(entity_id),
+                    "entity_text": self.entity_text_zh(entity_id),
+                    "entity_text_zh": self.entity_text_zh(entity_id),
+                    "entity_text_en": self.entity_text_en(entity_id),
                     "score": float(score),
                 }
             )
@@ -100,10 +141,14 @@ class Predictor:
             inputs={
                 "head_id": head,
                 "head": self.format_entity(head),
-                "head_text": self.entity_text(head),
+                "head_text": self.entity_text_zh(head),
+                "head_text_zh": self.entity_text_zh(head),
+                "head_text_en": self.entity_text_en(head),
                 "relation_id": rel,
                 "relation": self.format_relation(rel),
-                "relation_text": self.relation_text(rel),
+                "relation_text": self.relation_text_zh(rel),
+                "relation_text_zh": self.relation_text_zh(rel),
+                "relation_text_en": self.relation_text_en(rel),
             },
             results=results,
             latency_ms=latency_ms,
@@ -159,10 +204,14 @@ class Predictor:
             inputs={
                 "entity_id": entity,
                 "entity": self.format_entity(entity),
-                "entity_text": self.entity_text(entity),
+                "entity_text": self.entity_text_zh(entity),
+                "entity_text_zh": self.entity_text_zh(entity),
+                "entity_text_en": self.entity_text_en(entity),
                 "relation_ids": [self.parse_relation(rel) for rel in rel_values],
                 "relations": [self.format_relation(self.parse_relation(rel)) for rel in rel_values],
-                "relation_texts": [self.relation_text(self.parse_relation(rel)) for rel in rel_values],
+                "relation_texts": [self.relation_text_zh(self.parse_relation(rel)) for rel in rel_values],
+                "relation_texts_zh": [self.relation_text_zh(self.parse_relation(rel)) for rel in rel_values],
+                "relation_texts_en": [self.relation_text_en(self.parse_relation(rel)) for rel in rel_values],
             },
             results=outputs,
         )
@@ -174,7 +223,9 @@ class Predictor:
         results = {
             "entity_id": entity,
             "entity": entity_token,
-            "entity_text": self.entity_text(entity),
+            "entity_text": self.entity_text_zh(entity),
+            "entity_text_zh": self.entity_text_zh(entity),
+            "entity_text_en": self.entity_text_en(entity),
             "has_text_embedding": bool(hasattr(self.model, "text_emb") or hasattr(self.model, "text_base")),
             "has_image_embedding": bool(hasattr(self.model, "img_emb")),
             "has_image": self._has_image(entity),
@@ -198,7 +249,9 @@ class Predictor:
             inputs={
                 "entity_id": entity,
                 "entity": entity_token,
-                "entity_text": self.entity_text(entity),
+                "entity_text": self.entity_text_zh(entity),
+                "entity_text_zh": self.entity_text_zh(entity),
+                "entity_text_en": self.entity_text_en(entity),
             },
             results=results,
         )
@@ -241,14 +294,18 @@ class Predictor:
             inputs={
                 "entity_id": entity,
                 "entity": self.format_entity(entity),
-                "entity_text": self.entity_text(entity),
+                "entity_text": self.entity_text_zh(entity),
+                "entity_text_zh": self.entity_text_zh(entity),
+                "entity_text_en": self.entity_text_en(entity),
                 "space": space,
             },
             results=[
                 {
                     "entity_id": idx,
                     "entity": self.format_entity(idx),
-                    "entity_text": self.entity_text(idx),
+                    "entity_text": self.entity_text_zh(idx),
+                    "entity_text_zh": self.entity_text_zh(idx),
+                    "entity_text_en": self.entity_text_en(idx),
                     "score": float(score),
                 }
                 for idx, score in zip(top_indices.tolist(), top_scores.tolist())
@@ -256,9 +313,16 @@ class Predictor:
             latency_ms=latency_ms,
         )
 
-    def _load_text_maps(self) -> tuple[dict[str, str], dict[str, str]]:
-        entity_file, relation_file = infer_text_map_paths(self.cfg.get("dataset", {}).get("train"))
-        return load_tsv_map(entity_file), load_tsv_map(relation_file)
+    def _load_text_maps(self) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+        train_path = self.cfg.get("dataset", {}).get("train")
+        entity_file, relation_file = infer_text_map_paths(train_path)
+        entity_en_file, relation_en_file = infer_text_map_en_paths(train_path)
+        return (
+            load_tsv_map(entity_file),
+            load_tsv_map(relation_file),
+            load_tsv_map(entity_en_file),
+            load_tsv_map(relation_en_file),
+        )
 
     def _load_default_attribute_relations(self) -> list[str]:
         configured = self.cfg.get("inference", {}).get("attribute_relations")

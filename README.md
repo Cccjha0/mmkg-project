@@ -29,7 +29,9 @@ mmkg-project/
 - `ml/artifacts`: training outputs and checkpoints
 - `data/datasets`: raw and processed datasets
 - `data/cache`: cached text and image embeddings
-- `ml/inference`, `backend`, `frontend`, `docs`: scaffolded for the next phase
+- `ml/inference`: runtime loader, predictor API, CLI demo, and benchmarking
+- `frontend`: Vite + React + TypeScript UI scaffold
+- `backend`, `docs`: project support modules
 
 ## Training Quick Start
 
@@ -71,3 +73,34 @@ Artifacts are written under:
 ```text
 ml/artifacts/outputs/<exp_name>/<timestamp>_seed<seed>/
 ```
+
+## Inference Notes
+
+The inference layer now supports:
+
+- tail prediction
+- attribute completion
+- multimodal entity inspection
+- similar-entity retrieval
+- bilingual output fields for UI use
+
+Bilingual text resolution uses:
+
+- `*_entity2text.tsv` / `*_relation2text.tsv`
+- optional `*_entity2text_en.tsv` / `*_relation2text_en.tsv`
+
+English relation maps can be curated manually. Entity English text is intended to be generated offline and stored in `*_entity2text_en.tsv`.
+
+## Frontend Quick Start
+
+Run the Vite development server from the frontend directory:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+The dev server is configured in [vite.config.ts](/E:/learn/R&D/mmkg-project/frontend/vite.config.ts) and runs on:
+
+- [http://localhost:3000](http://localhost:3000)

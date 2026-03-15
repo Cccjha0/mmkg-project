@@ -68,6 +68,8 @@ The inference layer automatically loads:
 
 - `*_entity2text.tsv`
 - `*_relation2text.tsv`
+- `*_entity2text_en.tsv`
+- `*_relation2text_en.tsv`
 
 based on the configured training dataset path.
 
@@ -77,6 +79,33 @@ Entity formatting uses zero-padded tokens:
 - relations: `rel_0096`
 
 This is required for consistent lookup into dataset text maps.
+
+### Bilingual Output Fields
+
+The predictor now supports bilingual display fields for presentation and UI use.
+
+Current behavior:
+
+- `*_text` remains the compatibility field and currently points to Chinese text
+- `*_text_zh` is the Chinese source text
+- `*_text_en` is the English display text when an English map exists
+
+This applies to:
+
+- `head_text`, `head_text_zh`, `head_text_en`
+- `relation_text`, `relation_text_zh`, `relation_text_en`
+- `entity_text`, `entity_text_zh`, `entity_text_en`
+
+English resolution priority:
+
+1. `*_entity2text_en.tsv` / `*_relation2text_en.tsv`
+2. safe fallback: if the original text is already ASCII, reuse it for English display
+
+Recommended workflow:
+
+- curate relation English text manually
+- generate entity English text offline into `*_entity2text_en.tsv`
+- keep model training and internal ids unchanged
 
 ## Attribute Completion
 
@@ -94,7 +123,7 @@ Current OpenBG-IMG experiment configs already include explicit `attribute_relati
 `get_entity_multimodal()` currently returns:
 
 - entity id and token
-- entity text
+- entity text in bilingual fields
 - text/image embedding availability
 - whether an image exists
 - inferred `image_path` when available
@@ -187,6 +216,7 @@ Practical interpretation:
 
 - benchmark results are currently documented only for CPU
 - text output still shows terminal-encoding issues in the current shell on some Chinese strings
+- entity English text depends on `*_entity2text_en.tsv`; if that file is empty, `entity_text_en` will usually be empty
 - `tail_batch` is structurally standardized but not computationally optimized
 - attribute completion still depends on a manually curated relation list for best quality
 - no backend API layer has been added yet
