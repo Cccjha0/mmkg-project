@@ -38,8 +38,15 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.python-version
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # pytorch artifacts
 *.pt
