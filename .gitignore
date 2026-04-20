@@ -61,3 +61,6 @@ Thumbs.db
 
 # macOS junk folders
 __MACOSX__/
+
+# IDE
+.idea/
