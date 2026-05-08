@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Tuple, Union
 
 
-def parse_token_id(value: int | str, *, prefix: str) -> int:
+def parse_token_id(value: Union[int, str], *, prefix: str) -> int:
     if isinstance(value, int):
         return value
     if isinstance(value, str) and value.startswith(prefix):
@@ -15,11 +15,11 @@ def format_token_id(value: int, *, prefix: str, width: int) -> str:
     return f"{prefix}{int(value):0{width}d}"
 
 
-def parse_entity_id(value: int | str) -> int:
+def parse_entity_id(value: Union[int, str]) -> int:
     return parse_token_id(value, prefix="ent_")
 
 
-def parse_relation_id(value: int | str) -> int:
+def parse_relation_id(value: Union[int, str]) -> int:
     return parse_token_id(value, prefix="rel_")
 
 
@@ -31,7 +31,7 @@ def format_relation_id(value: int) -> str:
     return format_token_id(value, prefix="rel_", width=4)
 
 
-def infer_text_map_paths(train_path: str | Path | None) -> tuple[Path | None, Path | None]:
+def infer_text_map_paths(train_path: Optional[Union[str, Path]]) -> Tuple[Optional[Path], Optional[Path]]:
     if not train_path:
         return None, None
 
@@ -42,7 +42,7 @@ def infer_text_map_paths(train_path: str | Path | None) -> tuple[Path | None, Pa
     return raw_dir / f"{prefix}_entity2text.tsv", raw_dir / f"{prefix}_relation2text.tsv"
 
 
-def infer_text_map_en_paths(train_path: str | Path | None) -> tuple[Path | None, Path | None]:
+def infer_text_map_en_paths(train_path: Optional[Union[str, Path]]) -> Tuple[Optional[Path], Optional[Path]]:
     if not train_path:
         return None, None
 
@@ -53,7 +53,7 @@ def infer_text_map_en_paths(train_path: str | Path | None) -> tuple[Path | None,
     return raw_dir / f"{prefix}_entity2text_en.tsv", raw_dir / f"{prefix}_relation2text_en.tsv"
 
 
-def load_tsv_map(path: str | Path | None) -> dict[str, str]:
+def load_tsv_map(path: Optional[Union[str, Path]]) -> Dict[str, str]:
     if path is None:
         return {}
 
@@ -61,7 +61,7 @@ def load_tsv_map(path: str | Path | None) -> dict[str, str]:
     if not file_path.is_file():
         return {}
 
-    out: dict[str, str] = {}
+    out: Dict[str, str] = {}
     with file_path.open("r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.rstrip("\n")
@@ -82,9 +82,9 @@ def _is_ascii_text(value: str) -> bool:
 def resolve_bilingual_text(
     token: str,
     *,
-    zh_map: dict[str, str],
-    en_map: dict[str, str],
-) -> tuple[str | None, str | None]:
+    zh_map: Dict[str, str],
+    en_map: Dict[str, str],
+) -> Tuple[Optional[str], Optional[str]]:
     zh_text = zh_map.get(token)
     en_text = en_map.get(token)
 
@@ -102,8 +102,8 @@ def build_response(
     device: str,
     inputs: dict[str, Any],
     results: Any,
-    latency_ms: float | None = None,
-    extra: dict[str, Any] | None = None,
+    latency_ms: Optional[float] = None,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> dict[str, Any]:
     out = {
         "task": task,

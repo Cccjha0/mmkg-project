@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" role="img" aria-label="Running shoes placeholder">
+  <rect width="640" height="420" fill="#f5f7fb"/>
+  <path d="M115 258c55 2 109-8 162-31 20-9 39-19 58-30 19-11 45-5 56 13l21 35 95 18c22 4 38 23 38 45v16H104c-19 0-34-15-34-34v-14c0-11 9-19 20-18l25 0z" fill="#2f6f8f"/>
+  <path d="M148 248c48-2 91-13 130-33 19-10 37-21 54-32 13-8 31-5 40 8l30 43 105 19c26 5 45 27 45 54H96c-12 0-22-10-22-22 0-20 16-36 36-36l38-1z" fill="#ffffff" stroke="#1f2937" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M92 308h450" stroke="#1f2937" stroke-width="10" stroke-linecap="round"/>
+  <path d="M237 225l24 39M285 204l24 43M334 181l28 45" stroke="#ef8354" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="183" cy="288" r="11" fill="#1f2937"/>
+  <circle cx="244" cy="288" r="11" fill="#1f2937"/>
+  <text x="320" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#1f2937">Running Shoes</text>
+</svg>

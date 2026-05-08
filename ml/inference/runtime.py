@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 
@@ -8,7 +8,7 @@ from ml.inference.predictor import Predictor
 from ml.training.src.models.build_model import build_model
 
 
-def resolve_device(requested: str | None = None) -> str:
+def resolve_device(requested: Optional[str] = None) -> str:
     requested = (requested or "cpu").lower()
 
     if requested == "auto":
@@ -29,7 +29,7 @@ def resolve_device(requested: str | None = None) -> str:
     return "cpu"
 
 
-def _load_json(path: Path) -> dict[str, Any]:
+def _load_json(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -38,7 +38,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _normalize_project_path(raw: str | None) -> str | None:
+def _normalize_project_path(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return raw
 
@@ -64,7 +64,7 @@ def _normalize_project_path(raw: str | None) -> str | None:
     return str(direct)
 
 
-def _normalize_cfg_paths(cfg: dict[str, Any]) -> dict[str, Any]:
+def _normalize_cfg_paths(cfg: Dict[str, Any]) -> Dict[str, Any]:
     dataset = cfg.get("dataset", {})
     for key in ("train", "dev", "test", "cache_dir"):
         if key in dataset:
@@ -84,10 +84,10 @@ def _normalize_cfg_paths(cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_run_artifacts(
-    run_dir: str | Path | None = None,
-    config_path: str | Path | None = None,
-    checkpoint_path: str | Path | None = None,
-) -> tuple[Path, Path]:
+    run_dir: Optional[Union[str, Path]] = None,
+    config_path: Optional[Union[str, Path]] = None,
+    checkpoint_path: Optional[Union[str, Path]] = None,
+) -> Tuple[Path, Path]:
     cfg_path = Path(config_path) if config_path else None
     ckpt_path = Path(checkpoint_path) if checkpoint_path else None
 
@@ -110,12 +110,12 @@ def _resolve_run_artifacts(
 
 
 def load_runtime(
-    run_dir: str | Path | None = None,
+    run_dir: Optional[Union[str, Path]] = None,
     *,
-    config_path: str | Path | None = None,
-    checkpoint_path: str | Path | None = None,
+    config_path: Optional[Union[str, Path]] = None,
+    checkpoint_path: Optional[Union[str, Path]] = None,
     device: str = "cpu",
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     cfg_path, ckpt_path = _resolve_run_artifacts(
         run_dir=run_dir,
         config_path=config_path,
@@ -145,10 +145,10 @@ def load_runtime(
 
 
 def load_predictor(
-    run_dir: str | Path | None = None,
+    run_dir: Optional[Union[str, Path]] = None,
     *,
-    config_path: str | Path | None = None,
-    checkpoint_path: str | Path | None = None,
+    config_path: Optional[Union[str, Path]] = None,
+    checkpoint_path: Optional[Union[str, Path]] = None,
     device: str = "cpu",
 ) -> Predictor:
     runtime = load_runtime(

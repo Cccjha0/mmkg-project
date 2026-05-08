@@ -1,7 +1,7 @@
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -23,10 +23,10 @@ class Predictor:
     def __init__(
         self,
         model,
-        cfg: dict[str, Any],
+        cfg: Dict[str, Any],
         device: str,
         num_entities: int,
-        run_dir: str | Path,
+        run_dir: Union[str, Path],
     ):
         self.model = model
         self.cfg = cfg
@@ -43,10 +43,10 @@ class Predictor:
         ) = self._load_text_maps()
         self.default_attribute_relations = self._load_default_attribute_relations()
 
-    def parse_entity(self, value: int | str) -> int:
+    def parse_entity(self, value: Union[int, str]) -> int:
         return parse_entity_id(value)
 
-    def parse_relation(self, value: int | str) -> int:
+    def parse_relation(self, value: Union[int, str]) -> int:
         return parse_relation_id(value)
 
     def format_entity(self, entity_id: int) -> str:
@@ -55,13 +55,13 @@ class Predictor:
     def format_relation(self, relation_id: int) -> str:
         return format_relation_id(relation_id)
 
-    def entity_text(self, entity_id: int) -> str | None:
+    def entity_text(self, entity_id: int) -> Optional[str]:
         return self.entity_text_zh(entity_id)
 
-    def relation_text(self, relation_id: int) -> str | None:
+    def relation_text(self, relation_id: int) -> Optional[str]:
         return self.relation_text_zh(relation_id)
 
-    def entity_text_zh(self, entity_id: int) -> str | None:
+    def entity_text_zh(self, entity_id: int) -> Optional[str]:
         zh_text, _ = resolve_bilingual_text(
             self.format_entity(entity_id),
             zh_map=self.entity_text_map,
@@ -69,7 +69,7 @@ class Predictor:
         )
         return zh_text
 
-    def entity_text_en(self, entity_id: int) -> str | None:
+    def entity_text_en(self, entity_id: int) -> Optional[str]:
         _, en_text = resolve_bilingual_text(
             self.format_entity(entity_id),
             zh_map=self.entity_text_map,
@@ -77,7 +77,7 @@ class Predictor:
         )
         return en_text
 
-    def relation_text_zh(self, relation_id: int) -> str | None:
+    def relation_text_zh(self, relation_id: int) -> Optional[str]:
         zh_text, _ = resolve_bilingual_text(
             self.format_relation(relation_id),
             zh_map=self.relation_text_map,
@@ -85,7 +85,7 @@ class Predictor:
         )
         return zh_text
 
-    def relation_text_en(self, relation_id: int) -> str | None:
+    def relation_text_en(self, relation_id: int) -> Optional[str]:
         _, en_text = resolve_bilingual_text(
             self.format_relation(relation_id),
             zh_map=self.relation_text_map,
@@ -96,12 +96,12 @@ class Predictor:
     @torch.inference_mode()
     def predict_tail(
         self,
-        head_id: int | str,
-        rel_id: int | str,
+        head_id: Union[int, str],
+        rel_id: Union[int, str],
         *,
         topk: int = 10,
-        chunk_size: int | None = None,
-    ) -> dict[str, Any]:
+        chunk_size: Optional[int] = None,
+    ) -> Dict[str, Any]:
         start = time.perf_counter()
         head = self.parse_entity(head_id)
         rel = self.parse_relation(rel_id)
@@ -157,11 +157,11 @@ class Predictor:
     @torch.inference_mode()
     def predict_tail_batch(
         self,
-        pairs: list[tuple[int | str, int | str]],
+        pairs: List[Tuple[Union[int, str], Union[int, str]]],
         *,
         topk: int = 10,
-        chunk_size: int | None = None,
-    ) -> dict[str, Any]:
+        chunk_size: Optional[int] = None,
+    ) -> Dict[str, Any]:
         start = time.perf_counter()
         queries = [
             self.predict_tail(head_id=h, rel_id=r, topk=topk, chunk_size=chunk_size)
@@ -184,13 +184,13 @@ class Predictor:
     @torch.inference_mode()
     def complete_attributes(
         self,
-        entity_id: int | str,
+        entity_id: Union[int, str],
         *,
-        relation_ids: list[int | str] | None = None,
+        relation_ids: Optional[List[Union[int, str]]] = None,
         topk: int = 5,
-        chunk_size: int | None = None,
+        chunk_size: Optional[int] = None,
         max_relations: int = 5,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         entity = self.parse_entity(entity_id)
         rel_values = relation_ids or self.default_attribute_relations[:max_relations]
         outputs = []
@@ -217,7 +217,7 @@ class Predictor:
         )
 
     @torch.inference_mode()
-    def get_entity_multimodal(self, entity_id: int | str) -> dict[str, Any]:
+    def get_entity_multimodal(self, entity_id: Union[int, str]) -> Dict[str, Any]:
         entity = self.parse_entity(entity_id)
         entity_token = self.format_entity(entity)
         results = {
@@ -260,12 +260,12 @@ class Predictor:
     @torch.inference_mode()
     def similar_entities(
         self,
-        entity_id: int | str,
+        entity_id: Union[int, str],
         *,
         topk: int = 10,
         space: str = "fused",
-        chunk_size: int | None = None,
-    ) -> dict[str, Any]:
+        chunk_size: Optional[int] = None,
+    ) -> Dict[str, Any]:
         start = time.perf_counter()
         entity = self.parse_entity(entity_id)
         chunk = int(chunk_size or self.default_chunk_size)
@@ -313,7 +313,7 @@ class Predictor:
             latency_ms=latency_ms,
         )
 
-    def _load_text_maps(self) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+    def _load_text_maps(self) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str]]:
         train_path = self.cfg.get("dataset", {}).get("train")
         entity_file, relation_file = infer_text_map_paths(train_path)
         entity_en_file, relation_en_file = infer_text_map_en_paths(train_path)
@@ -324,13 +324,13 @@ class Predictor:
             load_tsv_map(relation_en_file),
         )
 
-    def _load_default_attribute_relations(self) -> list[str]:
+    def _load_default_attribute_relations(self) -> List[str]:
         configured = self.cfg.get("inference", {}).get("attribute_relations")
         if configured:
             return [self.format_relation(self.parse_relation(rel)) for rel in configured]
         return self._discover_default_attribute_relations()
 
-    def _discover_default_attribute_relations(self, topn: int = 10) -> list[str]:
+    def _discover_default_attribute_relations(self, topn: int = 10) -> List[str]:
         train_path = self.cfg.get("dataset", {}).get("train")
         if not train_path:
             return []
@@ -356,12 +356,12 @@ class Predictor:
         ids = torch.tensor([entity_id], dtype=torch.long, device=self.device)
         return self._entity_matrix(ids, space=space)[0]
 
-    def _has_image(self, entity_id: int) -> bool | None:
+    def _has_image(self, entity_id: int) -> Optional[bool]:
         if hasattr(self.model, "has_img"):
             return bool(self.model.has_img[entity_id].detach().cpu().item())
         return None
 
-    def _resolve_image_path(self, entity_id: int) -> str | None:
+    def _resolve_image_path(self, entity_id: int) -> Optional[str]:
         train_path = self.cfg.get("dataset", {}).get("train")
         if not train_path:
             return None
@@ -377,7 +377,7 @@ class Predictor:
             return str(image_path)
         return None
 
-    def _available_spaces(self, entity_id: int) -> list[str]:
+    def _available_spaces(self, entity_id: int) -> List[str]:
         spaces = []
         for space in ("text", "image", "fused", "entity_repr"):
             try:
@@ -387,8 +387,8 @@ class Predictor:
             spaces.append(space)
         return spaces
 
-    def _embedding_summary(self, entity_id: int) -> dict[str, Any]:
-        summary: dict[str, Any] = {}
+    def _embedding_summary(self, entity_id: int) -> Dict[str, Any]:
+        summary: Dict[str, Any] = {}
         for space in ("text", "image", "fused", "entity_repr"):
             try:
                 vec = self._entity_vector(entity_id, space=space).detach().cpu()
@@ -402,7 +402,7 @@ class Predictor:
             }
         return summary
 
-    def _fused_summary(self, entity_id: int) -> dict[str, Any] | None:
+    def _fused_summary(self, entity_id: int) -> Optional[Dict[str, Any]]:
         try:
             vec = self._entity_vector(entity_id, space="fused").detach().cpu()
         except Exception:
@@ -412,7 +412,7 @@ class Predictor:
             "l2_norm": float(vec.norm(p=2).item()),
         }
 
-    def _gate_summary(self, entity_id: int) -> dict[str, Any] | None:
+    def _gate_summary(self, entity_id: int) -> Optional[Dict[str, Any]]:
         if not hasattr(self.model, "gate_for_entities"):
             return None
         eids = torch.tensor([entity_id], dtype=torch.long, device=self.device)

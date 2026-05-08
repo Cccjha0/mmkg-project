@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
+class ErrorEnvelope(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any] | None = None
+
+
 class ErrorResponse(BaseModel):
-    code: str = Field(..., description="错误码")
-    message: str = Field(..., description="错误信息")
-    detail: str | None = Field(default=None, description="附加错误详情")
+    error: ErrorEnvelope
 
 
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: str = "mmkg-backend"
-    version: str = "0.1.0"
-    model_loaded: bool = True
+    model_loaded: bool = False
+    dataset: str = "OpenBG-IMG"
+    model: str = "Residual+Gate"
+    run_dir: str | None = None
+    warnings: list[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.utcnow)

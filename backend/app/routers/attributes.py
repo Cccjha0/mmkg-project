@@ -11,10 +11,10 @@ router = APIRouter(prefix="/api/entities", tags=["attribute-completion"])
 @router.get(
     "/{entity_id}/attribute-completion",
     response_model=AttributeCompletionResponse,
-    summary="获取属性补全表格数据",
+    summary="Attribute completion",
 )
 def api_get_attribute_completion(
-    entity_id: str = Path(..., description="实体 ID，例如 ent_007314"),
-    topk: int = Query(default=5, ge=1, le=20, description="predicted 属性候选数量"),
+    entity_id: str = Path(..., description="Entity id, for example ent_007314"),
+    topk: int = Query(default=5, ge=1, le=20, description="Maximum predicted candidates per relation"),
 ) -> AttributeCompletionResponse:
     return get_attribute_completion(entity_id=entity_id, topk=topk)
