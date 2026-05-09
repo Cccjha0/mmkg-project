@@ -46,6 +46,10 @@ def _best_seed_by_summary(model_code: str) -> str | None:
 def _default_production_run_dir(model_code: str) -> str:
     model_dir = repo_root() / "ml" / "artifacts" / "production_models" / model_code
     valid_runs = [path for path in model_dir.iterdir() if _valid_run_dir(path)] if model_dir.is_dir() else []
+    if not valid_runs and model_code == "gate+residual":
+        legacy_dir = repo_root() / "ml" / "artifacts" / "outputs" / "openbg_img_gated_vec_res_rel"
+        valid_runs = [path for path in legacy_dir.iterdir() if _valid_run_dir(path)] if legacy_dir.is_dir() else []
+
     if not valid_runs:
         return f"ml/artifacts/production_models/{model_code}"
 
