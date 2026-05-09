@@ -123,6 +123,39 @@ def _predict_relation(entity_id: str, relation_id: str, *, topk: int) -> tuple[l
     return _dedupe_options(options, topk=topk), candidate_count
 
 
+def _fallback_attribute_relations(entity_id: str, topk: int) -> list[AttributeRow]:
+    observed = triples_by_pair()
+    rows: list[AttributeRow] = []
+
+    for relation_id in sorted({relation for head, relation in observed if head == entity_id}):
+        existing = observed.get((entity_id, relation_id), [])
+        if not existing:
+            continue
+
+        options = [
+            _candidate(entity, raw_score=None, normalized_score=None, rank=rank)
+            for rank, entity in enumerate(existing[:topk], start=1)
+        ]
+        if not options:
+            continue
+
+        rows.append(
+            AttributeRow(
+                relation_id=relation_id,
+                relation_name=relation_text(relation_id),
+                relation_name_en=relation_text_en(relation_id),
+                source="existing",
+                selected_option_index=0,
+                selected_value=options[0],
+                options=options,
+                candidate_count=len(existing),
+                warning="Model artifacts are not ready; showing observed attributes only.",
+            )
+        )
+
+    return rows
+
+
 def get_attribute_completion(entity_id: str, topk: int) -> AttributeCompletionResponse:
     start = perf_counter()
     cfg = get_runtime_config()
@@ -130,15 +163,35 @@ def get_attribute_completion(entity_id: str, topk: int) -> AttributeCompletionRe
 
     status = predictor_status()
     if not status["model_ready"]:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": {
-                    "code": "MODEL_NOT_READY",
-                    "message": "Model artifacts are not ready for attribute completion.",
-                    "details": status,
-                }
+        text_zh = entity_text(entity_id)
+        text_en = entity_text_en(entity_id)
+        image_path = image_path_for_entity(entity_id)
+        rows = _fallback_attribute_relations(entity_id, topk)
+        latency_ms = round((perf_counter() - start) * 1000, 3)
+        return AttributeCompletionResponse(
+            model=f"{cfg['model_name']} (metadata only)",
+            device=cfg["device"],
+            inputs={
+                "entity": entity_id,
+                "entity_text": text_zh,
+                "entity_text_zh": text_zh,
+                "entity_text_en": text_en,
+                "topk": topk,
+                "attribute_relations": [row.relation_id for row in rows],
+                "model_status": status,
             },
+            results={
+                "entity_info": {
+                    "entity": entity_id,
+                    "entity_text": text_zh,
+                    "entity_text_zh": text_zh,
+                    "entity_text_en": text_en,
+                    "has_image": image_path is not None,
+                    "image_path": image_path,
+                },
+                "attribute_rows": [row.model_dump() for row in rows],
+            },
+            latency_ms=latency_ms,
         )
 
     predictor = get_predictor()

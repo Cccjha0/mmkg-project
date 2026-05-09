@@ -101,6 +101,36 @@ def _metrics_csv_for_model(model_dir: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def _load_accuracy_rows(model_dir: str) -> tuple[list[int], list[float]]:
+    metrics_path = _metrics_csv_for_model(model_dir)
+    if metrics_path is not None:
+        with metrics_path.open("r", encoding="utf-8", newline="") as file:
+            rows = list(csv.DictReader(file))
+
+        return (
+            [int(float(row["epoch"])) for row in rows],
+            [float(row["hits@10"]) for row in rows],
+        )
+
+    seed_paths = sorted(artifacts_path("plot_input", model_dir).glob("seed*.csv"))
+    if not seed_paths:
+        return [], []
+
+    values_by_epoch: dict[int, list[float]] = {}
+    for seed_path in seed_paths:
+        with seed_path.open("r", encoding="utf-8", newline="") as file:
+            for row in csv.DictReader(file):
+                epoch = int(float(row["epoch"]))
+                values_by_epoch.setdefault(epoch, []).append(float(row["hits@10"]))
+
+    epochs = sorted(values_by_epoch)
+    values = [
+        sum(values_by_epoch[epoch]) / len(values_by_epoch[epoch])
+        for epoch in epochs
+    ]
+    return epochs, values
+
+
 def _load_accuracy_dataset(dataset: str) -> AccuracyDatasetResponse:
     epochs: list[int] = []
     series: list[AccuracySeries] = []
@@ -109,15 +139,9 @@ def _load_accuracy_dataset(dataset: str) -> AccuracyDatasetResponse:
         if MODEL_DATASETS[model_key] != dataset:
             continue
 
-        metrics_path = _metrics_csv_for_model(model_key)
-        if metrics_path is None:
+        model_epochs, values = _load_accuracy_rows(model_key)
+        if not model_epochs or not values:
             continue
-
-        with metrics_path.open("r", encoding="utf-8", newline="") as file:
-            rows = list(csv.DictReader(file))
-
-        model_epochs = [int(float(row["epoch"])) for row in rows]
-        values = [float(row["hits@10"]) for row in rows]
 
         if not epochs:
             epochs = model_epochs

@@ -17,7 +17,7 @@ def _node(entity: str, node_type: str, center: bool = False) -> GraphNode:
     text_en = entity_text_en(entity)
     return GraphNode(
         id=entity,
-        label=text or entity,
+        label=text or text_en or entity,
         label_zh=text,
         label_en=text_en,
         type="demo_product" if center else node_type,

@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from app.deps import get_runtime_config
 from app.schemas.entity import EmbeddingSummary, EntityInfoResponse, SimilarEntitiesResponse, SimilarEntityItem
 from app.services.inference_service import get_predictor, predictor_status
-from app.services.openbg_img_data import entity_exists, entity_text, entity_text_en, image_path_for_entity
+from app.services.openbg_img_data import entity_exists, entity_embedding_summary, entity_text, entity_text_en, image_path_for_entity
 
 
 def _raise_entity_not_found(entity_id: str) -> None:
@@ -33,15 +33,26 @@ def get_entity_info(entity_id: str) -> EntityInfoResponse:
     _ensure_entity(entity_id)
     status = predictor_status()
     if not status["model_ready"]:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": {
-                    "code": "MODEL_NOT_READY",
-                    "message": "Model artifacts are not ready for entity inspection.",
-                    "details": status,
-                }
-            },
+        summary = {
+            key: EmbeddingSummary(**value)
+            for key, value in entity_embedding_summary(entity_id).items()
+        }
+        image_path = image_path_for_entity(entity_id)
+        text_zh = entity_text(entity_id)
+        text_en = entity_text_en(entity_id)
+        return EntityInfoResponse(
+            entity=entity_id,
+            entity_text=text_zh or text_en,
+            entity_text_zh=text_zh,
+            entity_text_en=text_en,
+            has_image=image_path is not None,
+            image_path=image_path,
+            image_status="available" if image_path else "missing",
+            available_spaces=list(summary.keys()),
+            embedding_summary=summary,
+            gate_mean=None,
+            model_name=f"{cfg['model_name']} (metadata only)",
+            dataset_name="openbg_img",
         )
 
     predictor = get_predictor()
