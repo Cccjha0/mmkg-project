@@ -14,6 +14,10 @@ ml/artifacts/outputs/openbg_img_gated/*
 !ml/artifacts/outputs/openbg_img_gated/.gitkeep
 ml/artifacts/outputs/results/**
 !ml/artifacts/outputs/results/.gitkeep
+ml/artifacts/production_models/**
+
+# runtime logs created by helper scripts
+.runtime_logs/
 
 data/datasets/*
 !data/datasets/openbg_img/
@@ -51,6 +55,18 @@ htmlcov/
 # pytorch artifacts
 *.pt
 *.ckpt
+*.pth
+*.safetensors
+*.onnx
+*.bin
+
+# archives and packaged artifacts
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
 
 # logs
 *.log
