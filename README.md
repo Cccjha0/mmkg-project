@@ -1,106 +1,131 @@
 # MMKG Project
 
-Multi-module repository for multimodal knowledge graph work. The current implementation focus is the ML training stack, with placeholders for inference, backend APIs, frontend web, shared data, and project docs.
+Multimodal commodity knowledge graph demo and research repository. The current project includes model training/inference code, a FastAPI backend, a Flask service for 3D knowledge-graph search, and a Vite React frontend.
+
+For a fuller handover guide, see [docs/HANDOVER.md](docs/HANDOVER.md).
+
+## Runtime Pieces
+
+- FastAPI backend: `http://127.0.0.1:8000`
+- Flask knowledge-graph search service: `http://127.0.0.1:5000`
+- Vite React frontend: `http://localhost:3000`
 
 ## Repository Layout
 
 ```text
 mmkg-project/
-  ml/
-    training/
-      src/
-      scripts/
-    inference/
-    artifacts/
-      outputs/
-    configs/
-  backend/
-  frontend/
-  data/
-    datasets/
-    cache/
-  docs/
+  backend/      FastAPI app and Flask KG search entrypoint
+  frontend/     React + Vite web application
+  kg/           OpenBG-IMG KG data conversion scripts
+  ml/           training, inference, configs, and local artifacts
+  data/         datasets, processed KG files, and embedding caches
+  docs/         handover, experiment protocol, and project notes
+  scripts/      one-command setup/start helpers
 ```
 
-## Current Status
+## Required Local Data
 
-- `ml/training`: training framework and model implementations
-- `ml/configs`: experiment and shared config files
-- `ml/artifacts`: training outputs and checkpoints
-- `data/datasets`: raw and processed datasets
-- `data/cache`: cached text and image embeddings
-- `ml/inference`: runtime loader, predictor API, CLI demo, and benchmarking
-- `frontend`: Vite + React + TypeScript UI scaffold
-- `backend`, `docs`: project support modules
-
-## Training Quick Start
-
-Install dependencies:
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Build OpenBG-IMG text cache:
-
-```bash
-python ml/training/scripts/build_cache_openbg_img_text.py ^
-  --entity2text data/datasets/openbg_img/raw/OpenBG-IMG_entity2text.tsv ^
-  --cache_dir data/cache/openbg_img
-```
-
-Build OpenBG-IMG image cache:
-
-```bash
-python ml/training/scripts/build_cache_openbg_img_image.py ^
-  --entity2text data/datasets/openbg_img/raw/OpenBG-IMG_entity2text.tsv ^
-  --images_root data/datasets/openbg_img/raw/OpenBG-IMG_images ^
-  --cache_dir data/cache/openbg_img
-```
-
-Run training:
-
-```bash
-python ml/training/scripts/run_train.py ^
-  --config ml/configs/openbg_img_gated_vec_res_rel.yaml ^
-  --common ml/configs/common.yaml
-```
-
-Artifacts are written under:
+Raw OpenBG-IMG files should be placed under:
 
 ```text
-ml/artifacts/outputs/<exp_name>/<timestamp>_seed<seed>/
+data/datasets/openbg_img/raw/
 ```
 
-## Inference Notes
+The KG visualization also needs:
 
-The inference layer now supports:
+```text
+data/datasets/openbg_img/processed/data.csv
+data/datasets/openbg_img/processed/metadata.json
+```
 
-- tail prediction
-- attribute completion
-- multimodal entity inspection
-- similar-entity retrieval
-- bilingual output fields for UI use
+These processed files can be generated from `kg/`:
 
-Bilingual text resolution uses:
+```bash
+cd kg
+python convert_openbg.py
+python generate_metadata.py
+```
 
-- `*_entity2text.tsv` / `*_relation2text.tsv`
-- optional `*_entity2text_en.tsv` / `*_relation2text_en.tsv`
+Model checkpoints are expected locally under:
 
-English relation maps can be curated manually. Entity English text is intended to be generated offline and stored in `*_entity2text_en.tsv`.
+```text
+ml/artifacts/production_models/
+```
 
-## Frontend Quick Start
+Large model artifacts are intentionally ignored by Git. The Attribute Completion backend first checks `ml/artifacts/production_models/gate+residual/` and then falls back to `ml/artifacts/outputs/openbg_img_gated_vec_res_rel/` when no production run is available.
 
-Run the Vite development server from the frontend directory:
+## One-Command Setup
+
+Windows PowerShell:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
+
+macOS/Linux:
+
+```bash
+bash scripts/install.sh
+```
+
+The setup scripts install Python dependencies, install frontend dependencies, and generate KG processed data when raw OpenBG-IMG files are available.
+
+## Start The Demo
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-dev.ps1
+```
+
+macOS/Linux:
+
+```bash
+bash scripts/start-dev.sh
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+On macOS/Linux, logs and pid files are written to `.runtime_logs/`. Stop background services with:
+
+```bash
+bash scripts/stop-dev.sh
+```
+
+## Manual Startup
+
+Start three terminals if you prefer manual control.
+
+FastAPI:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Flask KG service:
+
+```bash
+cd backend
+python flask_app.py
+```
+
+Frontend:
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The dev server is configured in [vite.config.ts](/E:/learn/R&D/mmkg-project/frontend/vite.config.ts) and runs on:
+## Useful Docs
 
-- [http://localhost:3000](http://localhost:3000)
+- [docs/HANDOVER.md](docs/HANDOVER.md): complete install, startup, data, model, and troubleshooting guide
+- [kg/README.md](kg/README.md): KG processed-data generation notes
+- [backend/README.md](backend/README.md): backend services and endpoints
+- [frontend/README.md](frontend/README.md): frontend development notes
+- [docs/EXPERIMENT_PROTOCOL.md](docs/EXPERIMENT_PROTOCOL.md): experiment and reproduction protocol
