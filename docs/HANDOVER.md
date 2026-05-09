@@ -2,6 +2,8 @@
 
 This document describes how to install, prepare, and run the current MMKG demo project.
 
+For the complete test plan and handover validation commands, see [TESTING.md](TESTING.md).
+
 ## 1. Repository
 
 ```powershell
@@ -231,7 +233,58 @@ Open:
 http://localhost:3000
 ```
 
-## 7. What Each Service Does
+## 7. Run Tests
+
+Install development test dependencies:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+```
+
+Run Python tests:
+
+```powershell
+python -m pytest
+```
+
+The Python suite covers:
+
+- FastAPI smoke behavior and request validation
+- production model run selection and fallback logic
+- KG `data.csv` / `metadata.json` generation
+- KG search result shape and graph-size caps
+- ML filtered ranking behavior
+
+Run frontend smoke tests:
+
+```powershell
+cd frontend
+npm test
+```
+
+Run frontend component tests:
+
+```powershell
+cd frontend
+npm run test:components
+```
+
+Run local E2E tests. This starts FastAPI, Flask KG, and Vite through Playwright. It depends on real local OpenBG-IMG data, generated KG processed files, and a local Playwright browser install:
+
+```powershell
+cd frontend
+npm run test:e2e:install
+npm run test:e2e
+```
+
+Run the frontend production build:
+
+```powershell
+cd frontend
+npm run build
+```
+
+## 8. What Each Service Does
 
 FastAPI `8000` serves:
 
@@ -248,7 +301,7 @@ Flask `5000` serves the 3D Knowledge Graph page:
 
 The current frontend 3D KG page still calls Flask directly at `127.0.0.1:5000`.
 
-## 8. Frontend Pages
+## 9. Frontend Pages
 
 ### Model Performance
 
@@ -295,7 +348,7 @@ Pants
 
 The backend limits 2-hop graph expansion to avoid browser freezes.
 
-## 9. Validation Commands
+## 10. Validation Commands
 
 Backend import check:
 
@@ -320,7 +373,7 @@ npm run build
 
 The frontend build currently emits a large chunk warning because Three.js is bundled. This warning does not block running the app.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### `/api/entities/...` returns 503
 
@@ -357,7 +410,7 @@ This should now be mitigated by backend graph limits and frontend input bounds. 
 
 Check that `ml/artifacts/plot_input/` contains seed CSV files or that old metrics files exist under `ml/artifacts/outputs/`.
 
-## 11. Git Notes
+## 12. Git Notes
 
 Do not commit large model checkpoints. `.gitignore` already ignores `*.ckpt`.
 

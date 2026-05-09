@@ -288,6 +288,7 @@ export function KnowledgeGraphExplorer() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
+                    aria-label="Search"
                     placeholder={language === "en" ? "Search Product..." : "搜索产品..."}
                     className="pl-10 h-9"
                     value={query}
@@ -325,6 +326,7 @@ export function KnowledgeGraphExplorer() {
                   Top K
                 </label>
                 <Input
+                  aria-label="Top K"
                   type="number"
                   className="h-9"
                   min={1}
@@ -344,6 +346,7 @@ export function KnowledgeGraphExplorer() {
                   Neighbours
                 </label>
                 <Input
+                  aria-label="Neighbours"
                   type="number"
                   className="h-9"
                   min={1}
@@ -363,6 +366,7 @@ export function KnowledgeGraphExplorer() {
                   Prune
                 </label>
                 <Input
+                  aria-label="Prune"
                   type="number"
                   className="h-9"
                   min={1}

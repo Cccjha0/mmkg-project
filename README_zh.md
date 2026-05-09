@@ -122,9 +122,53 @@ npm install
 npm run dev
 ```
 
+## 运行测试
+
+安装测试依赖：
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+运行后端、KG 数据生成和 ML 工具逻辑的 Python 测试：
+
+```bash
+python -m pytest
+```
+
+运行前端 smoke test：
+
+```bash
+cd frontend
+npm test
+```
+
+运行前端组件测试：
+
+```bash
+cd frontend
+npm run test:components
+```
+
+运行本地 E2E 测试。该命令会通过 Playwright 启动 FastAPI、Flask KG 和 Vite，并依赖本地真实 OpenBG-IMG 数据以及 KG processed 文件：
+
+```bash
+cd frontend
+npm run test:e2e:install
+npm run test:e2e
+```
+
+运行前端生产构建：
+
+```bash
+cd frontend
+npm run build
+```
+
 ## 常用文档
 
 - [docs/HANDOVER.md](docs/HANDOVER.md)：完整安装、启动、数据、模型和排错说明
+- [docs/TESTING.md](docs/TESTING.md)：完整测试说明，适合交接和本地验收
 - [kg/README.md](kg/README.md)：KG processed 数据生成说明
 - [backend/README.md](backend/README.md)：后端服务和接口说明
 - [frontend/README.md](frontend/README.md)：前端开发说明

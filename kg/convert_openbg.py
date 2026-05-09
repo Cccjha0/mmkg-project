@@ -1,74 +1,49 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import pandas as pd
-import os
 from tqdm import tqdm
 
-# =========================
-# OpenBG train 文件路径
-# =========================
 
-train_path = os.path.join(
-    "..",
-    "data",
-    "datasets",
-    "openbg_img",
-    "raw",
-    "OpenBG-IMG_train.tsv"
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TRAIN_PATH = PROJECT_ROOT / "data" / "datasets" / "openbg_img" / "raw" / "OpenBG-IMG_train.tsv"
+DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "data" / "datasets" / "openbg_img" / "processed" / "data.csv"
 
-# =========================
-# 输出 data.csv 路径
-# =========================
 
-output_path = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "data",
-    "datasets",
-    "openbg_img",
-    "processed",
-    "data.csv"
-)
+def convert_openbg(
+    train_path: str | Path = DEFAULT_TRAIN_PATH,
+    output_path: str | Path = DEFAULT_OUTPUT_PATH,
+    *,
+    show_progress: bool = True,
+) -> int:
+    """Convert OpenBG-IMG train triples from TSV into the CSV format used by KG search."""
+    train_path = Path(train_path)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-print("=" * 50)
-print("开始读取 OpenBG-IMG_train.tsv ...")
-print("=" * 50)
+    df = pd.read_csv(train_path, sep="\t", header=None)
 
-# =========================
-# 读取 TSV
-# =========================
+    with output_path.open("w", encoding="utf-8", newline="") as file:
+        rows = df.itertuples(index=False)
+        iterator = tqdm(rows, total=len(df), desc="Processing Triples", ncols=100) if show_progress else rows
+        for h, r, t in iterator:
+            file.write(f"{h},{r},{t}\n")
 
-df = pd.read_csv(
-    train_path,
-    sep="\t",
-    header=None
-)
+    return len(df)
 
-print(f"\n读取完成！")
-print(f"总三元组数量: {len(df)}")
 
-print("\n开始写入 data.csv ...")
+def main() -> None:
+    print("=" * 50)
+    print("Reading OpenBG-IMG_train.tsv ...")
+    print("=" * 50)
+    count = convert_openbg()
+    print("\n" + "=" * 50)
+    print("data.csv generated successfully.")
+    print(f"Total triples: {count}")
+    print(f"Saved to: {DEFAULT_OUTPUT_PATH}")
+    print("=" * 50)
 
-# =========================
-# 手动写入（支持进度条）
-# =========================
 
-with open(output_path, "w", encoding="utf-8") as f:
-
-    for row in tqdm(
-            df.itertuples(index=False),
-            total=len(df),
-            desc="Processing Triples",
-            ncols=100
-    ):
-
-        h, r, t = row
-
-        f.write(f"{h},{r},{t}\n")
-
-print("\n" + "=" * 50)
-print("data.csv 生成成功！")
-print(f"保存位置: {output_path}")
-print("=" * 50)
-
-print("\n前5条数据：")
-print(df.head())
+if __name__ == "__main__":
+    main()

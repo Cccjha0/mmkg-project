@@ -122,9 +122,53 @@ npm install
 npm run dev
 ```
 
+## Run Tests
+
+Install development test dependencies:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+Run Python tests for backend, KG data preparation, and ML utility logic:
+
+```bash
+python -m pytest
+```
+
+Run frontend smoke tests:
+
+```bash
+cd frontend
+npm test
+```
+
+Run frontend component tests:
+
+```bash
+cd frontend
+npm run test:components
+```
+
+Run local E2E tests. This starts FastAPI, Flask KG, and Vite through Playwright and expects real local OpenBG-IMG data plus KG processed files:
+
+```bash
+cd frontend
+npm run test:e2e:install
+npm run test:e2e
+```
+
+Run the frontend production build:
+
+```bash
+cd frontend
+npm run build
+```
+
 ## Useful Docs
 
 - [docs/HANDOVER.md](docs/HANDOVER.md): complete install, startup, data, model, and troubleshooting guide
+- [docs/TESTING.md](docs/TESTING.md): complete testing guide for handover and local validation
 - [kg/README.md](kg/README.md): KG processed-data generation notes
 - [backend/README.md](backend/README.md): backend services and endpoints
 - [frontend/README.md](frontend/README.md): frontend development notes

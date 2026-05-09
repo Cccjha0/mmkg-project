@@ -9,9 +9,15 @@ from flask import send_from_directory
 # 👇 这里修复！导入你的 Search 类
 from app.services.search import Search
 
+MAX_NODE_CONNECTIONS = Search.MAX_GRAPH_LINKS
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
+
+    @app.route("/health")
+    def health():
+        return {"status": "ok"}
 
     # 图片接口
     @app.route('/images/<entity_id>/<filename>')
@@ -136,12 +142,17 @@ def create_app():
                         "relation_en": relation_label_en
                     }
                 })
+                if len(connections) >= MAX_NODE_CONNECTIONS:
+                    break
+            if len(connections) >= MAX_NODE_CONNECTIONS:
+                break
 
         # 同时检查反向连接（其他节点指向该节点）
         # 遍历所有节点，查找哪些节点连接到当前节点
         print(f"\n开始检查反向连接...")
         reverse_count = 0
-        for source_node, targets in search.triples.items():
+        source_items = search.triples.items() if len(connections) < MAX_NODE_CONNECTIONS else []
+        for source_node, targets in source_items:
             if node_id in targets:
                 reverse_count += 1
                 if reverse_count <= 3:
@@ -179,6 +190,10 @@ def create_app():
                             "relation_en": relation_label_en
                         }
                     })
+                    if len(connections) >= MAX_NODE_CONNECTIONS:
+                        break
+                if len(connections) >= MAX_NODE_CONNECTIONS:
+                    break
 
         print(f"反向连接数量: {reverse_count}")
         print(f"最终总连接数量: {len(connections)}")

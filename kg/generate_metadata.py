@@ -1,217 +1,87 @@
+from __future__ import annotations
+
 import json
-import os
+from pathlib import Path
 
 import pandas as pd
-
 from tqdm import tqdm
 
-# =====================================================
-# entity files (Chinese and English)
-# =====================================================
 
-ENTITY_FILE_ZH = (
-    "../data/datasets/openbg_img/raw/"
-    "OpenBG-IMG_entity2text.tsv"
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+RAW_DIR = PROJECT_ROOT / "data" / "datasets" / "openbg_img" / "raw"
+DEFAULT_ENTITY_FILE_ZH = RAW_DIR / "OpenBG-IMG_entity2text.tsv"
+DEFAULT_ENTITY_FILE_EN = RAW_DIR / "OpenBG-IMG_entity2text_en.tsv"
+DEFAULT_RELATION_FILE_ZH = RAW_DIR / "OpenBG-IMG_relation2text.tsv"
+DEFAULT_RELATION_FILE_EN = RAW_DIR / "OpenBG-IMG_relation2text_en.tsv"
+DEFAULT_OUTPUT_FILE = PROJECT_ROOT / "data" / "datasets" / "openbg_img" / "processed" / "metadata.json"
 
-ENTITY_FILE_EN = (
-    "../data/datasets/openbg_img/raw/"
-    "OpenBG-IMG_entity2text_en.tsv"
-)
 
-# =====================================================
-# relation files (Chinese and English)
-# =====================================================
+def _read_label_map(path: str | Path, key_name: str) -> dict[str, str]:
+    df = pd.read_csv(path, sep="\t", header=None, names=[key_name, "label"])
+    return {str(key): str(label) for key, label in zip(df[key_name], df["label"])}
 
-RELATION_FILE_ZH = (
-    "../data/datasets/openbg_img/raw/"
-    "OpenBG-IMG_relation2text.tsv"
-)
 
-RELATION_FILE_EN = (
-    "../data/datasets/openbg_img/raw/"
-    "OpenBG-IMG_relation2text_en.tsv"
-)
+def generate_metadata(
+    entity_file_zh: str | Path = DEFAULT_ENTITY_FILE_ZH,
+    entity_file_en: str | Path = DEFAULT_ENTITY_FILE_EN,
+    relation_file_zh: str | Path = DEFAULT_RELATION_FILE_ZH,
+    relation_file_en: str | Path = DEFAULT_RELATION_FILE_EN,
+    output_file: str | Path = DEFAULT_OUTPUT_FILE,
+    *,
+    show_progress: bool = True,
+) -> dict[str, dict[str, str]]:
+    """Generate entity/relation display metadata for the KG Flask service."""
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
-# =====================================================
-# image root
-# =====================================================
+    entity_labels_zh = _read_label_map(entity_file_zh, "entity")
+    entity_labels_en = _read_label_map(entity_file_en, "entity")
+    relation_labels_zh = _read_label_map(relation_file_zh, "relation")
+    relation_labels_en = _read_label_map(relation_file_en, "relation")
 
-IMAGE_ROOT = (
-    "../data/datasets/openbg_img/raw/"
-    "OpenBG-IMG_images"
-)
+    metadata: dict[str, dict[str, str]] = {}
 
-# =====================================================
-# output
-# =====================================================
+    entity_ids = sorted(set(entity_labels_zh) | set(entity_labels_en))
+    entity_iterator = tqdm(entity_ids, desc="Entities") if show_progress else entity_ids
+    for entity_id in entity_iterator:
+        label_zh = entity_labels_zh.get(entity_id, "")
+        label_en = entity_labels_en.get(entity_id, "")
+        metadata[entity_id] = {
+            "label": label_en or label_zh,
+            "label_zh": label_zh,
+            "label_en": label_en,
+            "image": f"/images/{entity_id}/image_0.jpg",
+        }
 
-OUTPUT_FILE = "../data/datasets/openbg_img/processed/metadata.json"
+    relation_ids = sorted(set(relation_labels_zh) | set(relation_labels_en))
+    relation_iterator = tqdm(relation_ids, desc="Relations") if show_progress else relation_ids
+    for relation_id in relation_iterator:
+        label_zh = relation_labels_zh.get(relation_id, "")
+        label_en = relation_labels_en.get(relation_id, "")
+        metadata[relation_id] = {
+            "label": label_en or label_zh,
+            "label_zh": label_zh,
+            "label_en": label_en,
+        }
 
-# =====================================================
-# read entity labels (Chinese)
-# =====================================================
-
-print("=" * 60)
-print("Reading Chinese entity labels...")
-print("=" * 60)
-
-entity_df_zh = pd.read_csv(
-    ENTITY_FILE_ZH,
-    sep="\t",
-    header=None,
-    names=["entity", "label"]
-)
-
-# =====================================================
-# read entity labels (English)
-# =====================================================
-
-print("=" * 60)
-print("Reading English entity labels...")
-print("=" * 60)
-
-entity_df_en = pd.read_csv(
-    ENTITY_FILE_EN,
-    sep="\t",
-    header=None,
-    names=["entity", "label"]
-)
-
-# =====================================================
-# read relation labels (Chinese)
-# =====================================================
-
-print("=" * 60)
-print("Reading Chinese relation labels...")
-print("=" * 60)
-
-relation_df_zh = pd.read_csv(
-    RELATION_FILE_ZH,
-    sep="\t",
-    header=None,
-    names=["relation", "label"]
-)
-
-# =====================================================
-# read relation labels (English)
-# =====================================================
-
-print("=" * 60)
-print("Reading English relation labels...")
-print("=" * 60)
-
-relation_df_en = pd.read_csv(
-    RELATION_FILE_EN,
-    sep="\t",
-    header=None,
-    names=["relation", "label"]
-)
-
-# =====================================================
-# metadata dict
-# =====================================================
-
-metadata = {}
-
-# =====================================================
-# entities - build with both Chinese and English
-# =====================================================
-
-print("=" * 60)
-print("Generating entity metadata...")
-print("=" * 60)
-
-# Create dictionaries for quick lookup
-entity_labels_zh = dict(zip(entity_df_zh["entity"], entity_df_zh["label"]))
-entity_labels_en = dict(zip(entity_df_en["entity"], entity_df_en["label"]))
-
-# Get all unique entity IDs
-all_entity_ids = set(entity_df_zh["entity"].unique()) | set(entity_df_en["entity"].unique())
-
-for entity_id in tqdm(all_entity_ids):
-
-    entity_id_str = str(entity_id)
-
-    label_zh = str(entity_labels_zh.get(entity_id, ""))
-    label_en = str(entity_labels_en.get(entity_id, ""))
-
-    # Use English label as default if available, otherwise Chinese
-    default_label = label_en if label_en else label_zh
-
-    # ==========================================
-    # image url
-    # ==========================================
-
-    image_url = (
-        f"/images/{entity_id_str}/image_0.jpg"
+    output_file.write_text(
+        json.dumps(metadata, indent=4, ensure_ascii=False),
+        encoding="utf-8",
     )
+    return metadata
 
-    metadata[entity_id_str] = {
-        "label": default_label,
-        "label_zh": label_zh,
-        "label_en": label_en,
-        "image": image_url
-    }
 
-# =====================================================
-# relations - build with both Chinese and English
-# =====================================================
+def main() -> None:
+    print("=" * 60)
+    print("Generating metadata.json ...")
+    print("=" * 60)
+    metadata = generate_metadata()
+    print("=" * 60)
+    print("Done!")
+    print(f"Total metadata items: {len(metadata)}")
+    print(f"Saved to: {DEFAULT_OUTPUT_FILE}")
+    print("=" * 60)
 
-print("=" * 60)
-print("Generating relation metadata...")
-print("=" * 60)
 
-# Create dictionaries for quick lookup
-relation_labels_zh = dict(zip(relation_df_zh["relation"], relation_df_zh["label"]))
-relation_labels_en = dict(zip(relation_df_en["relation"], relation_df_en["label"]))
-
-# Get all unique relation IDs
-all_relation_ids = set(relation_df_zh["relation"].unique()) | set(relation_df_en["relation"].unique())
-
-for relation_id in tqdm(all_relation_ids):
-
-    relation_id_str = str(relation_id)
-
-    label_zh = str(relation_labels_zh.get(relation_id, ""))
-    label_en = str(relation_labels_en.get(relation_id, ""))
-
-    # Use English label as default if available, otherwise Chinese
-    default_label = label_en if label_en else label_zh
-
-    metadata[relation_id_str] = {
-        "label": default_label,
-        "label_zh": label_zh,
-        "label_en": label_en
-    }
-
-# =====================================================
-# save json
-# =====================================================
-
-print("=" * 60)
-print("Saving metadata.json ...")
-print("=" * 60)
-
-with open(
-        OUTPUT_FILE,
-        "w",
-        encoding="utf-8"
-) as f:
-
-    json.dump(
-        metadata,
-        f,
-        indent=4,
-        ensure_ascii=False
-    )
-
-# =====================================================
-# done
-# =====================================================
-
-print("=" * 60)
-print("Done!")
-print(f"Total metadata items: {len(metadata)}")
-print(f"Saved to: {OUTPUT_FILE}")
-print("=" * 60)
+if __name__ == "__main__":
+    main()

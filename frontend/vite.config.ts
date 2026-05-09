@@ -1,3 +1,4 @@
+  /// <reference types="vitest" />
 
   import { defineConfig } from 'vite';
   import react from '@vitejs/plugin-react-swc';
@@ -56,5 +57,11 @@
     server: {
       port: 3000,
       open: true,
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.ts',
+      globals: true,
+      exclude: ['node_modules/**', 'e2e/**', 'build/**'],
     },
   });
